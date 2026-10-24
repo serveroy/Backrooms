@@ -3,8 +3,6 @@
 // hum-buzz and ~600 million square miles of randomly segmented rooms.
 
 import { CN, CELL, ChunkLayout, F_SOLID, F_VOID } from '../world/layout.js';
-import { Howler } from '../entities/howler.js';
-import { Smiler } from '../entities/smiler.js';
 import { fbm2, hashf, RNG, hash32 } from '../core/rng.js';
 import { rasterLattice, placeGlitchWall, findWallSpot, findOpenCell, addBox, addPart, cylGeo, chunkRng } from './common.js';
 import { exitStatic, ambientEvents } from './director.js';
@@ -352,7 +350,7 @@ function director(game, dt, S) {
     if (p.sanity < 25) S.panicSpawn = true;
     const spot = game.findSpawnSpot({ min: 26, max: 38, noLOS: true, clear: 1 });
     if (spot) {
-      E.add(new Howler(game, spot.x, spot.z));
+      game.spawn('howler', spot.x, spot.z);
       S.howlerAt = S.t + 320 + Math.random() * 260;
     }
   }
@@ -363,7 +361,7 @@ function director(game, dt, S) {
     const inDark = game.playerLight < 0.16 || game.world.zoneAt(p.x, p.z) === 1;
     if (inDark && E.count('smiler') < 2 && Math.random() < 0.4) {
       const spot = game.findSpawnSpot({ min: 7, max: 15, los: true, dark: 0.06, notInView: true, clear: 0 });
-      if (spot) E.add(new Smiler(game, spot.x, spot.z));
+      if (spot) game.spawn('smiler', spot.x, spot.z);
     }
   }
 }

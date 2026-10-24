@@ -7,7 +7,6 @@ import { fbm2, hashf, RNG, hash32 } from '../core/rng.js';
 import { rasterLattice, findWallSpot, findOpenCell, chunkRng, wallRuns } from './common.js';
 import { troffer, partition, desk, monitor, officeChair, waterCooler, door, wallQuad } from './props.js';
 import { ambientEvents, exitCue } from './director.js';
-import { Faceling } from '../entities/faceling.js';
 
 const U = 16;
 const CEIL = 2.75;
@@ -247,7 +246,7 @@ function director(game, dt, S) {
     S.popT = 20;
     if (E.count('faceling') < 2 && Math.random() < 0.5) {
       const spot = game.findSpawnSpot({ min: 14, max: 26, noLOS: true });
-      if (spot) E.add(new Faceling(game, spot.x, spot.z));
+      if (spot) game.spawn('faceling', spot.x, spot.z);
     }
   }
   // something outside the windows (only when you aren't looking straight at it)

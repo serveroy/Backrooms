@@ -1,49 +1,74 @@
 // Partygoers — yellow figures with a crude drawn smile "=)". They have no
 // eyes and hunt by sound. Sprint and they find you. Crouch and pray.
+//
+// Model + animations: tools/blender/human.py (partygoer)
 
 import { Entity } from './base.js';
-import { makeHumanoid, animateWalk } from './humanoid.js';
+import * as THREE from 'three';
+import { instantiate, Animset, bone, markFacing, aimBone, locomotion } from './models.js';
+
+const _t = new THREE.Vector3();
 import { registerRecipes, getTexture } from '../world/textures.js';
+
+// "=)" drawn in marker on a decal over the face (see stolenFace for the UV
+// layout; this decal spans +-1.1 rad). Turned on its side it is a face:
+// two bars for eyes, a bracket for a grin.
+const SPAN = 1.1;
+const U = (x, z) => 0.5 + Math.atan2(x, -z) / (2 * SPAN);
+const Vy = (y) => 1 - (y + 0.075) / 0.2;
 
 registerRecipes({
   partyFace: () => {
+    const S = 512;
     const c = document.createElement('canvas');
-    c.width = 512;
-    c.height = 256;
+    c.width = c.height = S;
     const g = c.getContext('2d');
-    g.fillStyle = '#e8c53a';
-    g.fillRect(0, 0, 512, 256);
-    // "=)" drawn crudely on the front (u = 0.75)
-    g.strokeStyle = '#141008';
+    g.strokeStyle = '#120d06';
     g.lineCap = 'round';
-    g.lineWidth = 14;
-    g.beginPath();
-    g.moveTo(340, 95);
-    g.lineTo(372, 97);
-    g.moveTo(340, 135);
-    g.lineTo(372, 133);
-    g.stroke();
-    g.beginPath();
-    g.arc(388, 115, 52, -1.0, 1.0);
-    g.stroke();
-    return { canvas: c, worldW: 1, worldH: 1 };
+    g.lineJoin = 'round';
+    // a felt-tip line: a few slightly offset passes
+    const pen = (draw, w) => {
+      for (let i = 0; i < 3; i++) {
+        g.lineWidth = w - i * 3;
+        g.save();
+        g.translate((Math.random() - 0.5) * 3, (Math.random() - 0.5) * 3);
+        g.beginPath();
+        draw();
+        g.stroke();
+        g.restore();
+      }
+    };
+    const ey = Vy(0.05) * S;
+    for (const sx of [-1, 1]) {
+      const ex = U(0.03 * sx, -0.09) * S;
+      pen(() => {
+        g.moveTo(ex + 2 * sx, ey - 42);
+        g.lineTo(ex - 1 * sx, ey + 40);
+      }, 22);
+    }
+    const cx = S * 0.5;
+    const my = Vy(-0.005) * S;
+    const mw = (U(0.05, -0.08) - 0.5) * S;
+    pen(() => {
+      g.moveTo(cx - mw, my - 26);
+      g.bezierCurveTo(cx - mw * 0.6, my + 62, cx + mw * 0.6, my + 66, cx + mw * 1.02, my - 30);
+    }, 22);
+    return { canvas: c, flipY: false, clamp: true };
   },
 });
 
 export class Partygoer extends Entity {
   constructor(game, x, z) {
     super(game, x, z, { name: 'partygoer', radius: 0.3 });
-    const yellow = this.mat({ tint: [0.92, 0.76, 0.22] });
-    const mats = {
-      skin: yellow,
-      head: this.mat({ map: getTexture('partyFace') }),
-      shirt: yellow,
-      pants: yellow,
-      shoes: this.mat({ tint: [0.7, 0.55, 0.15] }),
-    };
-    this.rig = makeHumanoid(mats, { height: 1.85 + Math.random() * 0.15, headScale: [0.95, 1.05, 0.95], build: 1.1 });
-    this.obj.add(this.rig.root);
-    this.phase = 0;
+    const yellow = this.mat({ vertexColors: true, regions: [[0.9, 0.74, 0.2], [0.9, 0.74, 0.2], [0.9, 0.74, 0.2], [0.9, 0.74, 0.2]], wet: 0.35, rim: 0.04 });
+    const face = this.mat({ map: getTexture('partyFace'), alphaTest: 0.5, tint: [0.2, 0.2, 0.2] });
+    this.inst = instantiate('partygoer', (name) => (name === 'face' ? face : yellow));
+    this.inst.root.scale.setScalar(0.97 + Math.random() * 0.08);
+    this.head = bone(this.inst, 'head');
+    this.obj.add(this.inst.root);
+    markFacing(this.head);
+    this.anim = new Animset(this.inst);
+    this.anim.play('idle', { fade: 0 });
     this.target = null;
     this.setState('wander');
     this.voiceT = 3 + Math.random() * 6;
@@ -90,18 +115,28 @@ export class Partygoer extends Entity {
         }
         if (d < 1.0 && this.hitPlayer(45, 'The Partygoers found you =)')) {
           this.sound('partyHorn', { gain: 0.9 });
+          this.anim.play('attack', { fade: 0.1, once: true });
           this.setState('listen');
         }
         break;
       }
       case 'listen':
         this.move(0, 0, 0, dt);
-        this.rig.head.rotation.z = Math.sin(this.stateT * 2) * 0.4;
         if (this.stateT > 4) this.setState('wander');
         break;
     }
-    const sp = Math.hypot(this.vx, this.vz);
-    this.phase += dt * sp * 3.6;
-    animateWalk(this.rig, this.phase, sp, dt, { armSpread: sp > 3 ? 0.5 : 0.1, armsUp: sp > 3 ? -0.6 : 0 });
+  }
+
+  tick(dt) {
+    super.tick(dt);
+    const sp = Math.hypot(this.vx, this.vz) / this.inst.root.scale.x;
+    if (this.state === 'listen' && sp < 0.15 && !this.anim.oneShot) this.anim.play('listen', { fade: 0.4 });
+    else locomotion(this.anim, sp, { walk: 1.25, run: 3.7, runAt: 2.8 });
+    this.anim.update(dt);
+    // no eyes: it turns its head toward whatever it heard
+    if (this.state === 'hunt' && this.target) {
+      this.obj.updateMatrixWorld(true);
+      aimBone(this.head, _t.set(this.target[0], this.y + 1.6, this.target[1]), 0.6, 0.7);
+    }
   }
 }

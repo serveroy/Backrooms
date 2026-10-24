@@ -9,7 +9,7 @@ import { fbm2, hashf, RNG, hash32 } from '../core/rng.js';
 import { rasterLattice, findWallSpot, chunkRng } from './common.js';
 import { cageBulb, door, wallQuad } from './props.js';
 import { ambientEvents } from './director.js';
-import { objectMaterial } from '../world/materials.js';
+import { objectMaterial, glowMaterial } from '../world/materials.js';
 
 const U = 16;
 const CEIL = 2.9;
@@ -138,26 +138,34 @@ export function spawnPoint() {
 }
 
 function makeLeviathan(game) {
+  // modelled at 1/10 scale: tools/blender/leviathan.py
   const g = new THREE.Group();
-  const mat = objectMaterial({ tint: [0.01, 0.012, 0.014] });
+  const mat = objectMaterial({
+    vertexColors: true,
+    regions: [[0.035, 0.042, 0.05], [0.62, 0.66, 0.6], [0.07, 0.08, 0.09], [0.45, 0.44, 0.38]],
+    wet: 1,
+  });
   mat.uniforms.uObjLight.value.set(0.05, 0.05, 0.06);
-  const body = new THREE.Mesh(new THREE.SphereGeometry(1, 18, 12), mat);
-  body.scale.set(3.2, 1.8, 14);
-  g.add(body);
-  const tail = new THREE.Mesh(new THREE.ConeGeometry(1.6, 9, 10), mat);
-  tail.rotation.x = Math.PI / 2;
-  tail.position.z = 16;
-  g.add(tail);
-  for (const s of [-1, 1]) {
-    const fin = new THREE.Mesh(new THREE.BoxGeometry(6, 0.3, 3), mat);
-    fin.position.set(s * 4, -0.5, -2);
-    fin.rotation.z = s * 0.3;
-    g.add(fin);
+  const glow = glowMaterial({ color: [0.18, 0.55, 0.5], opacity: 0.9 });
+  const inst = game.model('leviathan', (name) => (name === 'glow' ? glow : mat));
+  if (inst) {
+    inst.root.scale.setScalar(10);
+    inst.root.updateMatrixWorld(true);
+    // a single pale eye, the size of a car door, catching what little light there is
+    const eyeMat = objectMaterial({ tint: [0.2, 0.2, 0.18], emissive: [0.25, 0.27, 0.22] });
+    const head = inst.bones.head;
+    if (head) {
+      for (const sx of [-1, 1]) {
+        const eye = new THREE.Mesh(new THREE.SphereGeometry(0.3, 12, 8), eyeMat);
+        eye.position.copy(head.worldToLocal(new THREE.Vector3(sx * 1.12, 0.55, -12.8)));
+        eye.scale.setScalar(0.1);
+        head.add(eye);
+      }
+    }
+    inst.actions.swim.play();
+    g.add(inst.root);
+    g.userData.inst = inst;
   }
-  // a single pale eye, the size of a car door
-  const eye = new THREE.Mesh(new THREE.SphereGeometry(0.6, 12, 8), objectMaterial({ tint: [0.2, 0.2, 0.18], emissive: [0.25, 0.27, 0.22] }));
-  eye.position.set(2.6, 0.4, -9);
-  g.add(eye);
   g.visible = false;
   game.addLevelObject(g);
   return g;
@@ -194,7 +202,18 @@ function director(game, dt, S) {
     const a = S.t * 0.18;
     const r = Math.max(4, 22 - S.swimT * 2.2);
     lev.position.set(p.x + Math.cos(a) * r, p.y - 6 + Math.min(4.5, S.swimT * 0.4), p.z + Math.sin(a) * r);
-    lev.rotation.y = -a;
+    // head first along the circle (the model faces -z)
+    lev.rotation.y = Math.PI - a;
+    const inst = lev.userData.inst;
+    if (inst) {
+      if (S.swimT > 8 && !S.lunge) {
+        S.lunge = true;
+        inst.actions.attack.reset().setLoop(THREE.LoopOnce, 1).play();
+        inst.actions.attack.clampWhenFinished = true;
+        inst.actions.swim.crossFadeTo(inst.actions.attack, 0.6, false);
+      }
+      inst.mixer.update(dt);
+    }
     if (S.swimT > 6 && !S.warned) {
       S.warned = true;
       game.audio.play('drone', { gain: 0.6, dur: 4, pitch: 0.35 });
@@ -209,6 +228,12 @@ function director(game, dt, S) {
     S.swimT = Math.max(0, (S.swimT || 0) - dt * 2);
     S.warned = false;
     lev.visible = false;
+    const inst = lev.userData.inst;
+    if (inst && S.lunge) {
+      S.lunge = false;
+      inst.actions.attack.stop();
+      inst.actions.swim.reset().play();
+    }
   }
 }
 

@@ -6,7 +6,6 @@ import { CN, CELL, ChunkLayout, F_SOLID, F_BLOCK } from '../world/layout.js';
 import { fbm2, hashf, RNG, hash32 } from '../core/rng.js';
 import { rasterLattice, findWallSpot, chunkRng } from './common.js';
 import { cageBulb, door, wallQuad } from './props.js';
-import { Smiler } from '../entities/smiler.js';
 
 const U = 8;
 const CEIL = 2.6;
@@ -140,7 +139,7 @@ function director(game, dt, S) {
     S.popT = 10;
     if (E.count('smiler') < 2 && Math.random() < 0.45) {
       const spot = game.findSpawnSpot({ min: 6, max: 14, los: true, notInView: true, clear: 0 });
-      if (spot) E.add(new Smiler(game, spot.x, spot.z));
+      if (spot) game.spawn('smiler', spot.x, spot.z);
     }
   }
 }

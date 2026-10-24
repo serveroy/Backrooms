@@ -8,8 +8,6 @@ import { fbm2, hashf, RNG, hash32 } from '../core/rng.js';
 import { carveNetwork, findWallSpot, findOpenCell, chunkRng, addBox } from './common.js';
 import { cageBulb, pipe, valve, door, exitSign, wallQuad } from './props.js';
 import { exitStatic, ambientEvents, exitCue } from './director.js';
-import { Smiler } from '../entities/smiler.js';
-import { Hound } from '../entities/hound.js';
 
 const U = 16; // 4.8m between junctions
 const CEIL = 2.65;
@@ -255,11 +253,11 @@ function director(game, dt, S) {
     const inDark = game.playerLight < 0.12;
     if (inDark && E.count('smiler') < 2 && Math.random() < 0.5) {
       const spot = game.findSpawnSpot({ min: 6, max: 13, los: true, dark: 0.07, notInView: true, clear: 0 });
-      if (spot) E.add(new Smiler(game, spot.x, spot.z));
+      if (spot) game.spawn('smiler', spot.x, spot.z);
     }
     if (S.t > 80 && E.count('hound') < 1 && Math.random() < 0.3) {
       const spot = game.findSpawnSpot({ min: 18, max: 30, noLOS: true });
-      if (spot) E.add(new Hound(game, spot.x, spot.z));
+      if (spot) game.spawn('hound', spot.x, spot.z);
     }
   }
 }

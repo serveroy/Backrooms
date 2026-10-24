@@ -8,7 +8,6 @@ import { fbm2, hashf, RNG, hash32 } from '../core/rng.js';
 import { carveNetwork, findWallSpot, findOpenCell, chunkRng, wallRuns, addBox } from './common.js';
 import { sconce, chandelier, door, wallQuad, pianoProp, table } from './props.js';
 import { ambientEvents, exitCue } from './director.js';
-import { Faceling } from '../entities/faceling.js';
 
 const U = 16;
 const CEIL = 3.2;
@@ -307,7 +306,7 @@ function director(game, dt, S) {
     S.popT = 25;
     if (E.count('faceling') < 2 && Math.random() < 0.4) {
       const spot = game.findSpawnSpot({ min: 14, max: 26, noLOS: true });
-      if (spot) E.add(new Faceling(game, spot.x, spot.z));
+      if (spot) game.spawn('faceling', spot.x, spot.z);
     }
   }
 }

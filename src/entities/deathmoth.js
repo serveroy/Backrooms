@@ -1,88 +1,135 @@
 // Deathmoths — moths the size of a dog. They hover around lights and are
 // drawn to your flashlight. Kill your light and they lose interest.
+//
+// Model + animations: tools/blender/deathmoth.py
 
 import * as THREE from 'three';
 import { Entity, sphere } from './base.js';
+import { instantiate, Animset, bone } from './models.js';
 import { registerRecipes, getTexture } from '../world/textures.js';
 
+// Wing atlas for the Blender-built moth (tools/blender/deathmoth.py): left
+// half the forewing, right half the hindwing. In each cell x runs from the
+// wing root to the tip, y from the leading edge (top) to the trailing edge.
 registerRecipes({
-  mothWing: () => {
+  mothWings: () => {
+    const W = 1024;
+    const H = 512;
     const c = document.createElement('canvas');
-    c.width = 256;
-    c.height = 256;
+    c.width = W;
+    c.height = H;
     const g = c.getContext('2d');
-    g.clearRect(0, 0, 256, 256);
-    // wing shape
-    g.fillStyle = '#5b4632';
-    g.beginPath();
-    g.moveTo(0, 128);
-    g.bezierCurveTo(60, 10, 220, 0, 250, 60);
-    g.bezierCurveTo(240, 140, 160, 190, 0, 150);
-    g.closePath();
-    g.fill();
-    // dusty bands and an eye spot
-    g.strokeStyle = 'rgba(30,20,12,0.6)';
-    g.lineWidth = 6;
-    for (let i = 0; i < 4; i++) {
+    const cell = (x0, outline, paint) => {
+      g.save();
+      g.translate(x0, 0);
       g.beginPath();
-      g.moveTo(30 + i * 40, 120);
-      g.quadraticCurveTo(60 + i * 45, 50, 100 + i * 40, 40);
-      g.stroke();
+      outline.forEach(([a, b], i) => (i ? g.lineTo(a * 512, b * H) : g.moveTo(a * 512, b * H)));
+      g.closePath();
+      g.save();
+      g.clip();
+      paint();
+      g.restore();
+      // veins
+      g.strokeStyle = 'rgba(20,14,8,0.5)';
+      g.lineWidth = 3;
+      for (let i = 0; i < 7; i++) {
+        const [a, b] = outline[Math.floor(1 + (i / 7) * (outline.length - 2))];
+        g.beginPath();
+        g.moveTo(0, outline[0][1] * H + 10);
+        g.quadraticCurveTo(a * 512 * 0.5, (b * H + outline[0][1] * H) / 2 - 20, a * 512, b * H);
+        g.stroke();
+      }
+      g.restore();
+    };
+    const mottle = (cols, n, rmax) => {
+      for (let i = 0; i < n; i++) {
+        g.fillStyle = cols[i % cols.length];
+        g.beginPath();
+        g.ellipse(Math.random() * 512, Math.random() * H, 8 + Math.random() * rmax, 4 + Math.random() * rmax * 0.5, Math.random() * 3, 0, Math.PI * 2);
+        g.fill();
+      }
+    };
+    // forewing: long and pointed, smoky brown, wavy pale lines, a pale eye-spot
+    cell(
+      0,
+      [[0, 0.34], [0.35, 0.18], [0.75, 0.07], [0.99, 0.04], [0.95, 0.3], [0.82, 0.62], [0.68, 0.86], [0.35, 0.8], [0, 0.66]],
+      () => {
+        g.fillStyle = '#3a2c20';
+        g.fillRect(0, 0, 512, H);
+        mottle(['rgba(90,70,50,0.35)', 'rgba(20,14,10,0.35)', 'rgba(130,110,80,0.25)'], 160, 40);
+        g.strokeStyle = 'rgba(190,170,130,0.55)';
+        g.lineWidth = 5;
+        for (const x of [150, 260, 380]) {
+          g.beginPath();
+          for (let y = 0; y <= H; y += 16) {
+            const xx = x + Math.sin(y * 0.06 + x) * 12 + y * 0.12;
+            y ? g.lineTo(xx, y) : g.moveTo(xx, y);
+          }
+          g.stroke();
+        }
+        g.fillStyle = '#d8cfb2';
+        g.beginPath();
+        g.arc(250, H * 0.42, 11, 0, Math.PI * 2);
+        g.fill();
+        g.fillStyle = 'rgba(15,10,6,0.6)';
+        g.fillRect(0, 0, 70, H);
+      }
+    );
+    // hindwing: yellow with two black bands following the outer margin
+    cell(
+      512,
+      [[0, 0.06], [0.45, 0.08], [0.85, 0.2], [0.96, 0.42], [0.86, 0.7], [0.62, 0.94], [0.3, 0.9], [0, 0.6]],
+      () => {
+        g.fillStyle = '#c99a2e';
+        g.fillRect(0, 0, 512, H);
+        mottle(['rgba(220,180,60,0.3)', 'rgba(150,100,30,0.3)'], 60, 30);
+        g.strokeStyle = '#120c08';
+        for (const [r, w] of [[420, 46], [300, 24]]) {
+          g.lineWidth = w;
+          g.beginPath();
+          g.arc(-40, H * 0.25, r, -0.2, 1.7);
+          g.stroke();
+        }
+        g.fillStyle = 'rgba(25,16,10,0.85)';
+        g.fillRect(0, 0, 90, H);
+      }
+    );
+    // torn and threadbare
+    g.globalCompositeOperation = 'destination-out';
+    for (let i = 0; i < 26; i++) {
+      const x = Math.random() < 0.5 ? 200 + Math.random() * 300 : 700 + Math.random() * 280;
+      const y = H * (0.2 + Math.random() * 0.75);
+      g.beginPath();
+      g.arc(x, y, 3 + Math.random() * 12, 0, Math.PI * 2);
+      g.fill();
     }
-    g.fillStyle = '#c9b48a';
-    g.beginPath();
-    g.arc(150, 95, 26, 0, Math.PI * 2);
-    g.fill();
-    g.fillStyle = '#1a120a';
-    g.beginPath();
-    g.arc(150, 95, 15, 0, Math.PI * 2);
-    g.fill();
-    g.fillStyle = '#e9dcc0';
-    g.beginPath();
-    g.arc(145, 90, 4, 0, Math.PI * 2);
-    g.fill();
-    return { canvas: c, worldW: 1, worldH: 1 };
+    return { canvas: c, flipY: false, clamp: true };
   },
 });
 
 export class Deathmoth extends Entity {
   constructor(game, x, z) {
     super(game, x, z, { name: 'deathmoth', radius: 0.35 });
-    const body = this.mat({ tint: [0.32, 0.25, 0.18] });
-    const wingMat = this.mat({ map: getTexture('mothWing'), doubleSide: true, alphaTest: 0.5 });
-    const root = this.obj;
-    const thorax = sphere(0.12, body, 10);
-    thorax.scale.set(1, 0.9, 1.6);
-    const abdomen = sphere(0.11, body, 10);
-    abdomen.scale.set(0.9, 0.85, 2.0);
-    abdomen.position.z = 0.28;
-    const head = sphere(0.08, body, 8);
-    head.position.z = -0.2;
+    const body = this.mat({ vertexColors: true, regions: [[0.36, 0.29, 0.22], [0.78, 0.66, 0.38], [0.05, 0.04, 0.035], [0.2, 0.15, 0.1]], rim: 0.08 });
+    const wings = this.mat({ map: getTexture('mothWings'), doubleSide: true, alphaTest: 0.5 });
     this.core = new THREE.Group();
-    this.core.add(thorax, abdomen, head);
-    for (const sx of [-1, 1]) {
-      const eye = sphere(0.035, this.mat({ tint: [0.1, 0.1, 0.1], emissive: [0.4, 0.15, 0.05] }), 6);
-      eye.position.set(sx * 0.05, 0.02, -0.25);
-      this.core.add(eye);
-      const ant = new THREE.Mesh(new THREE.CylinderGeometry(0.004, 0.006, 0.3, 4), body);
-      ant.position.set(sx * 0.05, 0.1, -0.35);
-      ant.rotation.set(-0.9, 0, sx * 0.4);
-      this.core.add(ant);
+    this.obj.add(this.core);
+    this.inst = instantiate('deathmoth', (name) => (name === 'wing' ? wings : body));
+    this.core.add(this.inst.root);
+    // a red glint in each compound eye
+    const head = bone(this.inst, 'head');
+    if (head) {
+      const eyeMat = this.mat({ tint: [0.05, 0.03, 0.03], emissive: [0.5, 0.13, 0.05] });
+      for (const sx of [-1, 1]) {
+        const e = sphere(0.016, eyeMat, 6);
+        e.position.copy(head.worldToLocal(new THREE.Vector3(sx * 0.07, 0.01, -0.17)));
+        head.add(e);
+      }
     }
-    this.wings = [];
-    for (const sx of [-1, 1]) {
-      const pivot = new THREE.Group();
-      pivot.position.set(sx * 0.08, 0.04, -0.02);
-      const geo = new THREE.PlaneGeometry(0.85, 0.85);
-      geo.translate(0.42, 0, 0);
-      geo.rotateX(-Math.PI / 2);
-      const w = new THREE.Mesh(geo, wingMat);
-      if (sx < 0) w.scale.x = -1;
-      pivot.add(w);
-      this.core.add(pivot);
-      this.wings.push({ pivot, sx });
-    }
-    root.add(this.core);
+    this.anim = new Animset(this.inst);
+    this.anim.play('fly', { fade: 0 });
+    this.inst.mixer.setTime(Math.random());
+    this.core.position.y = 2.1;
     this.hover = 2.1;
     this.phase = Math.random() * 10;
     this.setState('flutter');
@@ -121,12 +168,18 @@ export class Deathmoth extends Entity {
       this.flutterT = this.state === 'approach' ? 0.8 : 1.6;
       if (d < 18) this.sound('flutter', { gain: 0.35, dur: this.flutterT });
     }
-    // flight: bob and flap
-    const flap = Math.sin(this.phase * (this.state === 'approach' ? 26 : 18));
-    for (const w of this.wings) w.pivot.rotation.z = w.sx * (0.15 + flap * 0.75);
+    // flight: bob and pitch with the wingbeat
     const target = this.state === 'approach' ? Math.min(2.2, p.eyeY - 0.2) : this.hover;
     this.core.position.y += (target + Math.sin(this.phase * 2.1) * 0.25 - this.core.position.y) * Math.min(1, dt * 3);
     this.core.rotation.x = Math.sin(this.phase * 1.7) * 0.15;
+  }
+
+  tick(dt) {
+    super.tick(dt);
+    const close = this.state === 'approach' && this.distToPlayer() < 2.5;
+    this.anim.play(close ? 'attack' : 'fly', { fade: 0.2 });
+    this.anim.speed(this.state === 'approach' ? 1.5 : 1.0);
+    this.anim.update(dt);
   }
 
   updateLight(dt) {

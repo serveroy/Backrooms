@@ -8,10 +8,6 @@ import { fbm2, hashf, RNG, hash32 } from '../core/rng.js';
 import { rasterLattice, findWallSpot, findOpenCell, addBox, chunkRng } from './common.js';
 import { hangingTube, crateStack, cardboardStack, door, exitSign, shelf, pipe, wallQuad } from './props.js';
 import { exitStatic, ambientEvents, exitCue } from './director.js';
-import { Hound } from '../entities/hound.js';
-import { Deathmoth } from '../entities/deathmoth.js';
-import { Faceling } from '../entities/faceling.js';
-import { Smiler } from '../entities/smiler.js';
 
 const U = 16; // 4.8m lattice
 const CEIL = 4.6;
@@ -312,7 +308,7 @@ function director(game, dt, S) {
     if (S.blackT > 3 && !S.blackSmiler && E.count('smiler') < 1) {
       S.blackSmiler = true;
       const spot = game.findSpawnSpot({ min: 6, max: 12, los: true, notInView: true, clear: 0 });
-      if (spot) E.add(new Smiler(game, spot.x, spot.z));
+      if (spot) game.spawn('smiler', spot.x, spot.z);
     }
   } else S.blackSmiler = false;
 
@@ -322,15 +318,15 @@ function director(game, dt, S) {
     S.popT = 12;
     if (S.t > 45 && E.count('hound') < (S.blackout ? 3 : 2)) {
       const spot = game.findSpawnSpot({ min: 22, max: 34, noLOS: true });
-      if (spot) E.add(new Hound(game, spot.x, spot.z));
+      if (spot) game.spawn('hound', spot.x, spot.z);
     }
     if (E.count('deathmoth') < 1 && Math.random() < 0.3) {
       const spot = game.findSpawnSpot({ min: 18, max: 30, noLOS: true });
-      if (spot) E.add(new Deathmoth(game, spot.x, spot.z));
+      if (spot) game.spawn('deathmoth', spot.x, spot.z);
     }
     if (E.count('faceling') < 2 && Math.random() < 0.35) {
       const spot = game.findSpawnSpot({ min: 15, max: 28, noLOS: true });
-      if (spot) E.add(new Faceling(game, spot.x, spot.z));
+      if (spot) game.spawn('faceling', spot.x, spot.z);
     }
   }
   void S.unused;

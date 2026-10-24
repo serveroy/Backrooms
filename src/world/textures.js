@@ -18,7 +18,9 @@ export function getTexture(name) {
   if (!recipe) throw new Error('Unknown texture ' + name);
   const out = recipe();
   const tex = new THREE.CanvasTexture(out.canvas);
-  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.wrapS = tex.wrapT = out.clamp ? THREE.ClampToEdgeWrapping : THREE.RepeatWrapping;
+  // decals on glTF models use glTF's top-left UV origin
+  if (out.flipY === false) tex.flipY = false;
   tex.colorSpace = out.linear ? THREE.NoColorSpace : THREE.SRGBColorSpace;
   tex.anisotropy = anisotropy;
   tex.generateMipmaps = true;

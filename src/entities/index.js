@@ -6,6 +6,7 @@ import { Deathmoth } from './deathmoth.js';
 import { Faceling } from './faceling.js';
 import { SkinStealer } from './skinstealer.js';
 import { Partygoer } from './partygoer.js';
+import { Phantom } from './phantom.js';
 
 export const ENTITY_TYPES = {
   howler: Howler,
@@ -15,4 +16,5 @@ export const ENTITY_TYPES = {
   faceling: Faceling,
   skinstealer: SkinStealer,
   partygoer: Partygoer,
+  phantom: Phantom,
 };

@@ -8,7 +8,6 @@ import { findOpenCell, findWallSpot, chunkRng, addPart, cylGeo, cachedGeo } from
 import { table, cake, wallQuad } from './props.js';
 import { exitStatic, ambientEvents } from './director.js';
 import level0 from './level0.js';
-import { Partygoer } from '../entities/partygoer.js';
 import * as THREE from 'three';
 
 const BAL = [9, 10, 11, 12, 13];
@@ -112,7 +111,7 @@ function director(game, dt, S) {
     const max = S.t > 120 ? 4 : S.t > 45 ? 3 : 2;
     if (E.count('partygoer') < max) {
       const spot = game.findSpawnSpot({ min: 18, max: 32, noLOS: true });
-      if (spot) E.add(new Partygoer(game, spot.x, spot.z));
+      if (spot) game.spawn('partygoer', spot.x, spot.z);
     }
   }
 }

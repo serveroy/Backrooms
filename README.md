@@ -1,9 +1,9 @@
 # The Backrooms
 
 A 3D survival-horror game set in the Backrooms, playable in any desktop browser.
-Everything (textures, models, lighting, sound) is generated procedurally at
-runtime. There are no asset files, and the whole game builds into one ~1 MB
-HTML file.
+Textures, lighting and sound are generated procedurally at runtime, and the
+creatures are sculpted, rigged and animated from code in Blender. The whole
+game builds into one ~4 MB HTML file.
 
 > *If you're not careful and you noclip out of reality in the wrong areas,
 > you'll end up in the Backrooms, where it's nothing but the stink of old moist
@@ -95,10 +95,37 @@ Each level is infinite and procedurally generated per run.
   resolution keeps the frame rate up on slower GPUs.
 - **Audio**: a Web Audio synth for the 120 Hz hum, footsteps per surface,
   reverb, and every entity voice (`src/audio/audio.js`).
+- **Creatures**: built by Python scripts that drive Blender (`tools/blender/`).
+  Each body is sculpted as a signed distance field: round cones, ellipsoids
+  and boxes joined with smooth blends, so muscle flows into bone, plus carved
+  details such as eye sockets and gill slits. Clothing is a layer offset from
+  the body surface, with hard hems and cuffs. Marching cubes turns the field
+  into a mesh, which Blender decimates and rigs with automatic weights. Vertex
+  colours are baked: material regions (skin, shirt, trousers, hair) in RGB and
+  ambient occlusion in alpha, so one model takes per-creature colours in game.
+  Animations are keyed from code. Painted details (the Skin-Stealer's stitched
+  face, the Partygoers' "=)", the moth's wings) are canvas textures on
+  UV-mapped decals. The GLBs are then quantized and their animation tracks
+  pruned (`tools/optimize-models.mjs`) before being inlined.
 
 `tools/profile-chunks.mjs` profiles the chunk pipeline in Node, and
 `tools/reachability.mjs` checks that every level's exits are reachable from the
 spawn.
+
+### Rebuilding the creatures
+
+The built models are committed (`src/assets/creatures/`), so you only need
+this to change a creature. You need Python 3.13 with Blender's Python module
+and scikit-image:
+
+```sh
+pip install bpy==5.2.3 scikit-image
+npm run models            # or BLENDER_PY=/path/to/python npm run models
+```
+
+Each script also renders previews, for example
+`python tools/blender/human.py -- faceling out.glb previews/faceling` (add
+`--motion` for a contact sheet of every animation).
 
 ## Credits
 

@@ -7,9 +7,6 @@ import { fbm2, hashf, RNG, hash32 } from '../core/rng.js';
 import { rasterLattice, findWallSpot, findOpenCell, chunkRng, addBox } from './common.js';
 import { hangingTube, pipe, electricalBox, door, wallQuad } from './props.js';
 import { ambientEvents, exitCue } from './director.js';
-import { Smiler } from '../entities/smiler.js';
-import { Hound } from '../entities/hound.js';
-import { SkinStealer } from '../entities/skinstealer.js';
 
 const U = 8;
 const CEIL = 3.0;
@@ -296,15 +293,15 @@ function director(game, dt, S) {
     S.popT = 8;
     if (S.t > 25 && E.count('hound') < 2 && Math.random() < 0.6) {
       const spot = game.findSpawnSpot({ min: 18, max: 30, noLOS: true });
-      if (spot) E.add(new Hound(game, spot.x, spot.z));
+      if (spot) game.spawn('hound', spot.x, spot.z);
     }
     if (S.t > 60 && E.count('skinstealer') < 1 && Math.random() < 0.35) {
       const spot = game.findSpawnSpot({ min: 14, max: 26, noLOS: true });
-      if (spot) E.add(new SkinStealer(game, spot.x, spot.z));
+      if (spot) game.spawn('skinstealer', spot.x, spot.z);
     }
     if (game.playerLight < 0.12 && E.count('smiler') < 2 && Math.random() < 0.4) {
       const spot = game.findSpawnSpot({ min: 6, max: 13, los: true, dark: 0.07, notInView: true, clear: 0 });
-      if (spot) E.add(new Smiler(game, spot.x, spot.z));
+      if (spot) game.spawn('smiler', spot.x, spot.z);
     }
   }
 }

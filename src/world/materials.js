@@ -244,13 +244,21 @@ void main() {
 
 const OBJ_VERT = /* glsl */ `
 ${COMMON}
+#include <skinning_pars_vertex>
+#include <color_pars_vertex>
 varying vec3 vWorldPos;
 varying vec3 vNormalW;
 varying vec2 vUv;
 void main() {
-  vec4 wp = modelMatrix * vec4(position, 1.0);
+  #include <color_vertex>
+  #include <skinbase_vertex>
+  #include <begin_vertex>
+  #include <skinning_vertex>
+  #include <beginnormal_vertex>
+  #include <skinnormal_vertex>
+  vec4 wp = modelMatrix * vec4(transformed, 1.0);
   vWorldPos = wp.xyz;
-  vNormalW = normalize(mat3(modelMatrix) * normal);
+  vNormalW = normalize(mat3(modelMatrix) * objectNormal);
   vUv = uv;
   gl_Position = projectionMatrix * viewMatrix * wp;
 }
@@ -259,6 +267,7 @@ void main() {
 const OBJ_FRAG = /* glsl */ `
 ${COMMON}
 ${FRAG_LIGHTS}
+#include <color_pars_fragment>
 uniform sampler2D map;
 uniform vec3 uTint;
 uniform vec3 uObjLight;
@@ -266,6 +275,8 @@ uniform vec3 uEmissive;
 uniform float uOpacity;
 uniform float uRim;
 uniform float uAlphaTest;
+uniform vec3 uRegion[4];
+uniform float uWet;
 varying vec3 vWorldPos;
 varying vec3 vNormalW;
 varying vec2 vUv;
@@ -276,13 +287,24 @@ void main() {
   vec4 tex = texture2D(map, vUv);
   if (tex.a < uAlphaTest) discard;
   vec3 albedo = tex.rgb * uTint;
+  #if defined( USE_COLOR_ALPHA )
+    // baked creature colours: RGB = region masks, A = ambient occlusion
+    vec3 reg = uRegion[0] * vColor.r + uRegion[1] * vColor.g + uRegion[2] * vColor.b
+      + uRegion[3] * max(0.0, 1.0 - vColor.r - vColor.g - vColor.b);
+    albedo *= reg * vColor.a;
+  #endif
   float hemi = 0.5 + 0.5 * n.y;
   // the probe has no receiver cosine, so scale it to match baked surfaces
   vec3 light = uObjLight * (0.16 + 0.36 * hemi) * uLightScale * disturbance(wp) + flashlight(wp, n) + pointLights(wp, n);
   vec3 col = albedo * light + uEmissive * tex.rgb;
-  if (uRim > 0.0) {
-    vec3 v = normalize(cameraPosition - wp);
-    col += uObjLight * pow(1.0 - max(dot(v, n), 0.0), 4.0) * uRim * (0.5 + 0.5 * hemi);
+  vec3 v = normalize(cameraPosition - wp);
+  float fres = pow(1.0 - max(dot(v, n), 0.0), 4.0);
+  if (uRim > 0.0) col += uObjLight * fres * uRim * (0.5 + 0.5 * hemi);
+  if (uWet > 0.0) {
+    // wet, waxy skin: a sharp highlight from the flashlight and a sheen at grazing angles
+    vec3 toF = normalize(uFlashPos - wp);
+    float spec = pow(max(dot(reflect(-toF, n), v), 0.0), 40.0);
+    col += uFlashColor * spec * uWet * 0.6 + uObjLight * fres * uWet * 0.12;
   }
   col = applyFog(col, distance(cameraPosition, wp));
   gl_FragColor = vec4(col, uOpacity * tex.a);
@@ -339,7 +361,10 @@ export function objectMaterial(opts = {}) {
       uOpacity: { value: opts.opacity ?? 1 },
       uRim: { value: opts.rim ?? 0 },
       uAlphaTest: { value: opts.alphaTest ?? 0 },
+      uRegion: { value: (opts.regions || [[1, 1, 1], [1, 1, 1], [1, 1, 1], [1, 1, 1]]).map((c) => new THREE.Color().setRGB(c[0], c[1], c[2], THREE.SRGBColorSpace)) },
+      uWet: { value: opts.wet ?? 0 },
     },
+    vertexColors: !!opts.vertexColors,
     transparent: !!opts.transparent,
     depthWrite: opts.depthWrite ?? !opts.transparent,
     side: opts.doubleSide ? THREE.DoubleSide : THREE.FrontSide,
@@ -359,11 +384,15 @@ export function glowMaterial(opts = {}) {
       uTime: G.uTime,
     },
     vertexShader: /* glsl */ `
+      #include <skinning_pars_vertex>
       varying vec2 vUv;
       varying float vDist;
       void main() {
         vUv = uv;
-        vec4 wp = modelMatrix * vec4(position, 1.0);
+        #include <skinbase_vertex>
+        #include <begin_vertex>
+        #include <skinning_vertex>
+        vec4 wp = modelMatrix * vec4(transformed, 1.0);
         vDist = distance(wp.xyz, cameraPosition);
         gl_Position = projectionMatrix * viewMatrix * wp;
       }

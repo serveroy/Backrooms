@@ -377,6 +377,22 @@ export class Entity {
   remove() {
     this.dead = true;
   }
+
+  /** Free per-entity GPU resources (the model's geometry is shared between clones). */
+  dispose() {
+    if (this.inst) {
+      this.inst.mixer.stopAllAction();
+      this.inst.mixer.uncacheRoot(this.inst.root);
+      const seen = new Set();
+      this.inst.root.traverse((o) => {
+        if (o.isSkinnedMesh && !seen.has(o.skeleton)) {
+          seen.add(o.skeleton);
+          o.skeleton.dispose();
+        }
+      });
+    }
+    for (const m of this.mats) m.dispose();
+  }
 }
 
 export class EntityManager {
@@ -397,7 +413,10 @@ export class EntityManager {
   }
 
   clear() {
-    for (const e of this.list) this.group.remove(e.obj);
+    for (const e of this.list) {
+      this.group.remove(e.obj);
+      e.dispose();
+    }
     this.list.length = 0;
     this.field.valid = false;
   }
@@ -426,7 +445,7 @@ export class EntityManager {
       const e = this.list[i];
       if (e.dead) {
         this.group.remove(e.obj);
-        if (e.dispose) e.dispose();
+        e.dispose();
         this.list.splice(i, 1);
       }
     }
@@ -437,17 +456,6 @@ export class EntityManager {
 }
 
 // ---------------------------------------------------------------- model helpers
-
-/** A limb segment hanging from its pivot along -Y. */
-export function limb(len, r0, r1, mat, seg = 7) {
-  const pivot = new THREE.Group();
-  const geo = new THREE.CylinderGeometry(r1, r0, len, seg, 1);
-  geo.translate(0, -len / 2, 0);
-  const m = new THREE.Mesh(geo, mat);
-  pivot.add(m);
-  pivot.userData.len = len;
-  return pivot;
-}
 
 export function sphere(r, mat, seg = 10) {
   return new THREE.Mesh(new THREE.SphereGeometry(r, seg, Math.max(6, seg - 2)), mat);

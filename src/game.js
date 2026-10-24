@@ -17,7 +17,8 @@ import { Player } from './player/player.js';
 import { Items, ITEM_NAMES } from './items.js';
 import { EntityManager } from './entities/base.js';
 import { ENTITY_TYPES } from './entities/index.js';
-import { Phantom } from './entities/phantom.js';
+import { loadModels, instantiate } from './entities/models.js';
+import { MODEL_SOURCES } from './entities/assets.js';
 import { getLevel } from './levels/index.js';
 import { loadSettings, saveSettings } from './core/settings.js';
 import { loadGame, saveGame, newGameState } from './core/save.js';
@@ -98,6 +99,11 @@ export class Game {
     window.addEventListener('pointerdown', wake);
     this.resize();
     this.last = performance.now();
+    // creature models are parsed in the background while the menu shows
+    this.modelsLoaded = false;
+    loadModels(MODEL_SOURCES).then(() => {
+      this.modelsLoaded = true;
+    });
     this.enterMenu();
     requestAnimationFrame((t) => this.loop(t));
   }
@@ -779,10 +785,32 @@ export class Game {
     return { mode: this.mode, level: this.level?.id, x: this.player.x, z: this.player.z, health: this.player.health };
   }
 
+  /**
+   * An animated creature model for level scenery (level modules are also
+   * bundled into the chunk worker, so they reach the model library through here).
+   */
+  model(name, matFor) {
+    return this.modelsLoaded ? instantiate(name, matFor) : null;
+  }
+
+  /** Spawn an entity by registry name (used by level directors). */
+  spawn(name, x, z, opts = {}) {
+    const C = ENTITY_TYPES[name];
+    if (!C || !this.modelsLoaded) return null;
+    try {
+      return this.entities.add(new C(this, x, z, opts));
+    } catch (err) {
+      // a model that failed to load shouldn't take the game down with it
+      console.error('spawn failed', name, err);
+      return null;
+    }
+  }
+
   /** Debug: spawn an entity in front of the player. */
   debugSpawn(name, dist = 4, opts = {}) {
     const C = ENTITY_TYPES[name];
     const p = this.player;
+    if (!C || !this.modelsLoaded) return null;
     const x = p.x - Math.sin(p.yaw) * dist;
     const z = p.z - Math.cos(p.yaw) * dist;
     const e = this.entities.add(new C(this, x, z, opts));
@@ -832,7 +860,7 @@ export class Game {
     const p = this.player;
     this.world.update(p.x, p.z);
     this.loadingT += dt;
-    const ready = this.world.missingNear(p.x, p.z, 1) === 0;
+    const ready = this.world.missingNear(p.x, p.z, 1) === 0 && this.modelsLoaded;
     if (ready && this.loadingT > 0.6) {
       this.ui.hideLoading();
       this.ui.showHUD(true);
@@ -1207,7 +1235,7 @@ export class Game {
       const x = p.x + Math.sin(ang) * d;
       const z = p.z + Math.cos(ang) * d;
       if (this.world.los(p.x, p.z, x, z) && !(this.world.flagsAt(x, z) & (F_SOLID | F_BLOCK))) {
-        this.entities.add(new Phantom(this, x, z));
+        this.spawn('phantom', x, z);
       }
     } else {
       this.audio.play('static', { gain: 0.12, dur: 0.3 });

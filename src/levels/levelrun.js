@@ -6,7 +6,6 @@ import { CN, CELL, ChunkLayout, F_SOLID, F_BLOCK } from '../world/layout.js';
 import { hashf, RNG, hash32 } from '../core/rng.js';
 import { addBox } from './common.js';
 import { beacon, crateStack, pipe, door, exitSign, wallQuad } from './props.js';
-import { Howler } from '../entities/howler.js';
 
 const CEIL = 3.0;
 const HALF = 5; // corridor half width in cells (3.3m wide)
@@ -152,15 +151,17 @@ function director(game, dt, S) {
   }
   if (S.t > 2.5 && !S.spawned) {
     S.spawned = true;
-    const h = E.add(new Howler(game, p.x - 9, p.z, { state: 'chase', chaseSpeed: 4.35, relentless: true, damage: 200 }));
-    h.yaw = -Math.PI / 2;
-    h.sound('howl', { gain: 1, dur: 2.4 });
+    const h = game.spawn('howler', p.x - 9, p.z, { state: 'chase', chaseSpeed: 4.35, relentless: true, damage: 200 });
+    if (h) {
+      h.yaw = -Math.PI / 2;
+      h.sound('howl', { gain: 1, dur: 2.4 });
+    }
     game.caption('[RUN]');
   }
   if (S.t > 45 && !S.second) {
     S.second = true;
-    const h = E.add(new Howler(game, p.x - 14, p.z, { state: 'chase', chaseSpeed: 4.5, relentless: true, damage: 200 }));
-    h.sound('howl', { gain: 1, dur: 2.0 });
+    const h = game.spawn('howler', p.x - 14, p.z, { state: 'chase', chaseSpeed: 4.5, relentless: true, damage: 200 });
+    if (h) h.sound('howl', { gain: 1, dur: 2.0 });
   }
   // they keep pace no matter how far ahead you get
   for (const e of E.list) {
