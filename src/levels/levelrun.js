@@ -12,7 +12,7 @@ const CEIL = 3.0;
 const HALF = 5; // corridor half width in cells (3.3m wide)
 const EXIT_GX = 1100; // ~330m
 
-const M = { wall: 0, floor: 1, ceil: 2, metal: 3, crate: 4, pipe: 5, door: 6, sign: 7, hazard: 8 };
+const M = { wall: 0, floor: 1, ceil: 2, metal: 3, crate: 4, pipe: 5, door: 6, sign: 7, hazard: 8, exitDoor: 9 };
 
 export function generate(cx, cz, seed) {
   const L = new ChunkLayout(cx, cz, { floorY: 0, ceilY: CEIL });
@@ -126,7 +126,7 @@ export function buildProps(L, B) {
         door(B, S, p.x, p.z, p.dx, p.dz, 0.95, 2.1);
         break;
       case 'exit':
-        door(B, S, p.x, p.z, p.dx, p.dz, 1.2, 2.2);
+        door(B, { ...S, slab: M.exitDoor }, p.x, p.z, p.dx, p.dz, 1.2, 2.2);
         exitSign(B, S, p.x - 0.01, 2.5, p.z, p.dx, p.dz);
         break;
     }
@@ -209,9 +209,10 @@ export default {
     { tex: 'rustyMetal' },
     { tex: 'woodCrate' },
     { tex: 'pipeGrey' },
-    { tex: 'metalDoor' },
+    { tex: 'metalDoorPlain' },
     { tex: 'exitSign', emissive: [3, 3, 3] },
     { tex: 'hazardStripe' },
+    { tex: 'metalDoor', emissive: [0.15, 0.3, 0.15] },
   ],
   fixtureMaterial: { tex: 'cageBulb' },
   generate,

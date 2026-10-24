@@ -255,7 +255,7 @@ export default {
     waterLevel: WATER,
   },
   materials: [
-    { tex: 'wetWallpaper', grime: [0.45, 0.3, 0.04, 0.2], stainColor: [0.3, 0.35, 0.32], damp: 1 },
+    { tex: 'wetWallpaper', grime: [0.6, 0.35, 0.06, 0.3], stainColor: [0.25, 0.3, 0.28], damp: 1.2 },
     { tex: 'carpetL0', tint: [0.35, 0.38, 0.36] },
     { tex: 'ceilingL0', tint: [0.5, 0.55, 0.55], grime: [0.4, 0.2, 0.05, 0.2], stainColor: [0.5, 0.45, 0.35] },
     { tex: 'rustyMetal' },

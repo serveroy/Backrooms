@@ -107,7 +107,7 @@ export function generate(cx, cz, seed) {
         const dzm = Math.floor((z0 + z1) / 2);
         L.props.push({ type: 'drain', x: L.wx(dxm), z: L.wz(dzm), y: depth });
         L.exits.push({ type: 'drain', x: L.wx(dxm), z: L.wz(dzm), target: 'level4' });
-        L.interact.push({ type: 'exit', target: 'level4', kind: 'noclip', x: L.wx(dxm), y: WL + 0.6, z: L.wz(dzm), prompt: 'Dive down toward the drain', reach: 3.6, cone: 0.2, swimOnly: true });
+        L.interact.push({ type: 'exit', target: 'level4', kind: 'noclip', x: L.wx(dxm), y: WL + 0.6, z: L.wz(dzm), prompt: 'Dive down toward the drain', reach: 4.2, cone: -1, swimOnly: true });
       }
     }
   }
@@ -184,7 +184,7 @@ export default {
     ambientMin: [0.03, 0.035, 0.038],
     ceilBounce: 1.5,
     fogColor: [0.62, 0.7, 0.72],
-    fogDensity: 0.022,
+    fogDensity: 0.011,
     exposure: 1.15,
     grade: { tint: [0.98, 1.01, 1.02], saturation: 0.9, contrast: 0.96 },
     vignette: 0.15,

@@ -12,6 +12,7 @@ export const DEFAULT_SETTINGS = {
   grain: true,
   bloom: true,
   renderScale: 1.0,
+  autoRes: true,
   viewDist: 2,
   headBob: 1.0,
   captions: true,

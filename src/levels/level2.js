@@ -102,7 +102,7 @@ export function generate(cx, cz, seed) {
       for (const [lx, lz] of spots) {
         if (L.get(lx, lz) & F_SOLID) continue;
         const h = hashf(gi, gj, seed, 51);
-        const dk = fbm2(gi / 5 + 3, gj / 5, seed + 61, 2);
+        const dk = fbm2(gi / 5 + 3, gj / 5, seed + 61, 2) - Math.max(0, 1 - Math.hypot(gi, gj) / 4) * 0.6;
         let mode = 'on';
         if (dk > 0.64) mode = h < 0.2 ? 'dying' : 'off';
         else if (h < 0.18) mode = 'flicker';

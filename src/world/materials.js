@@ -277,7 +277,8 @@ void main() {
   if (tex.a < uAlphaTest) discard;
   vec3 albedo = tex.rgb * uTint;
   float hemi = 0.5 + 0.5 * n.y;
-  vec3 light = uObjLight * (0.45 + 0.55 * hemi) * uLightScale * disturbance(wp) + flashlight(wp, n) + pointLights(wp, n);
+  // the probe has no receiver cosine, so scale it to match baked surfaces
+  vec3 light = uObjLight * (0.16 + 0.36 * hemi) * uLightScale * disturbance(wp) + flashlight(wp, n) + pointLights(wp, n);
   vec3 col = albedo * light + uEmissive * tex.rgb;
   if (uRim > 0.0) {
     vec3 v = normalize(cameraPosition - wp);
@@ -331,7 +332,8 @@ export function objectMaterial(opts = {}) {
     uniforms: {
       ...G,
       map: { value: opts.map || getTexture('white') },
-      uTint: { value: new THREE.Color(...(opts.tint || [1, 1, 1])) },
+      // object colours are authored as display (sRGB) values
+      uTint: { value: new THREE.Color().setRGB(...(opts.tint || [1, 1, 1]), THREE.SRGBColorSpace) },
       uObjLight: { value: new THREE.Vector3(1, 1, 1) },
       uEmissive: { value: new THREE.Color(...(opts.emissive || [0, 0, 0])) },
       uOpacity: { value: opts.opacity ?? 1 },
@@ -422,7 +424,7 @@ void main() {
   vec3 r = reflect(-v, n);
   float spec = pow(max(r.y, 0.0), 220.0) * uSpecular;
   col += L * spec * 2.5;
-  col += flashlight(wp, n) * 0.25 * uShallow;
+  col += flashlight(wp, n) * (0.12 + fres * 1.5) * vec3(0.65, 0.75, 0.8);
   col = applyFog(col, distance(cameraPosition, wp));
   float alpha = mix(uClarity < 0.5 ? 0.97 : 0.42, 0.98, fres);
   gl_FragColor = vec4(col, alpha);

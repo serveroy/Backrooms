@@ -81,7 +81,7 @@ export class Player {
     const w = this.world;
     const f = w.flagsG(gx, gz);
     if (f & (F_SOLID | F_BLOCK)) return true;
-    if (f & F_GLITCH) return !this.noclipping;
+    if (f & F_GLITCH) return false; // glitching walls let you through: that's the exit
     const fy = w.floorG(gx, gz);
     if (fy > y + 0.42 && !(this.swimming && fy < w.waterG(gx, gz) + 0.3)) return true;
     const cy = w.ceilG(gx, gz);

@@ -87,7 +87,7 @@ export function generate(cx, cz, seed) {
       const gj = cz * per + j;
       const h = hashf(gi, gj, seed, 81);
       if (h < 0.12) continue;
-      const dk = fbm2(gi / 6 - 4, gj / 6 + 2, seed + 91, 2);
+      const dk = fbm2(gi / 6 - 4, gj / 6 + 2, seed + 91, 2) - Math.max(0, 1 - Math.hypot(gi, gj) / 8) * 0.6;
       let mode = 'on';
       if (dk > 0.63) mode = h < 0.3 ? 'dying' : 'off';
       else if (h < 0.36) mode = 'flicker';

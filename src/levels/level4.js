@@ -299,7 +299,7 @@ export default {
     { tex: 'white', tint: [0.75, 0.74, 0.7] },
     { tex: 'monitorScreen', emissive: [0.9, 0.9, 0.9] },
     { tex: 'windowNight', emissive: [0.12, 0.13, 0.16] },
-    { tex: 'metalDoor', tint: [0.9, 0.95, 1.05] },
+    { tex: 'metalDoorPlain', tint: [0.9, 0.95, 1.05] },
     { tex: 'stairsSign', emissive: [0.35, 0.35, 0.35] },
     { tex: 'white', tint: [0.55, 0.75, 0.85] },
     { tex: 'white', tint: [0.3, 0.3, 0.3] },

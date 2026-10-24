@@ -496,12 +496,9 @@ function wetWallpaper() {
   const buf = fromCanvas(src);
   buf.each((x, y, c) => {
     const l = c[0] * 0.3 + c[1] * 0.59 + c[2] * 0.11;
-    const mold = pfbm(x / 512, y / 512, 3, 4, 506);
-    const drip = pfbm(x / 512, y / 512, 9, 3, 507, 0.5, 2);
-    const k = 1 - 0.55 * Math.max(0, Math.min(1, (mold - 0.5) * 3)) - 0.15 * Math.max(0, drip - 0.55) * 3;
-    c[0] = l * 0.55 * k;
-    c[1] = l * 0.63 * k;
-    c[2] = l * 0.62 * k;
+    c[0] = l * 0.5;
+    c[1] = l * 0.6;
+    c[2] = l * 0.6;
   });
   return { canvas: buf.toCanvas(), worldW: 0.6, worldH: 0.6 };
 }

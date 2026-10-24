@@ -40,7 +40,14 @@ export class Input {
     });
     window.addEventListener('blur', () => this.down.clear());
     document.addEventListener('mousemove', (e) => {
-      if (!this.locked) return;
+      if (!this.locked) {
+        // fallback when pointer lock is unavailable (e.g. sandboxed iframes): drag to look
+        if (this.fallback && e.buttons & 1) {
+          this.mouseDX += e.movementX;
+          this.mouseDY += e.movementY;
+        }
+        return;
+      }
       // ignore absurd spikes some browsers emit on lock
       if (Math.abs(e.movementX) > 400 || Math.abs(e.movementY) > 400) return;
       this.mouseDX += e.movementX;
@@ -55,21 +62,52 @@ export class Input {
     });
     document.addEventListener('pointerlockchange', () => {
       this.locked = document.pointerLockElement === this.canvas;
+      if (this.locked) this.everLocked = true;
       if (!this.locked) this.down.clear();
       if (this.onLockChange) this.onLockChange(this.locked);
     });
   }
 
+  get active() {
+    return this.locked || this.fallback;
+  }
+
   lock() {
+    if (this.fallback) {
+      if (this.onLockChange) this.onLockChange(true);
+      return;
+    }
     if (document.pointerLockElement === this.canvas) return;
-    const p = this.canvas.requestPointerLock?.({ unadjustedMovement: true });
+    let p;
+    try {
+      p = this.canvas.requestPointerLock?.({ unadjustedMovement: true });
+    } catch (e) {
+      p = null;
+    }
     if (p && p.catch) {
       p.catch(() => {
         // unadjustedMovement unsupported: retry plain
-        const p2 = this.canvas.requestPointerLock?.();
+        let p2;
+        try {
+          p2 = this.canvas.requestPointerLock?.();
+        } catch (e) {
+          p2 = null;
+        }
         if (p2 && p2.catch) p2.catch(() => {});
       });
     }
+    // if the lock never arrives (sandboxed frame, policy), switch to drag-to-look
+    clearTimeout(this._lockT);
+    this._lockT = setTimeout(() => {
+      if (!this.locked && !this.everLocked) this.enableFallback();
+    }, 900);
+  }
+
+  enableFallback() {
+    if (this.fallback) return;
+    this.fallback = true;
+    if (this.onFallback) this.onFallback();
+    if (this.onLockChange) this.onLockChange(true);
   }
 
   unlock() {

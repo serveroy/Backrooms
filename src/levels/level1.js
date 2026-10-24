@@ -51,7 +51,8 @@ function params(seed) {
 }
 
 function darkness(gx, gz, seed) {
-  return fbm2(gx / 70 + 13, gz / 70 - 7, seed + 77, 3);
+  const near = Math.max(0, 1 - (Math.hypot(gx, gz) * CELL) / 24);
+  return fbm2(gx / 70 + 13, gz / 70 - 7, seed + 77, 3) - near * 0.6;
 }
 
 export function generate(cx, cz, seed) {

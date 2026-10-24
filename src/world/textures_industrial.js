@@ -317,7 +317,7 @@ function exitSign() {
   return { canvas: c, worldW: 1, worldH: 1 };
 }
 
-function metalDoor() {
+function metalDoor(plain = false) {
   const S = 256;
   const buf = new TexBuf(S, S * 2);
   const b = hex('#5b6260');
@@ -338,9 +338,14 @@ function metalDoor() {
     g.fillStyle = 'rgba(210,190,90,0.55)';
     g.font = 'bold 54px Impact, Arial Black, sans-serif';
     g.textAlign = 'center';
-    g.fillText('EXIT', 128, 110);
-    g.font = 'bold 18px Arial';
-    g.fillText('MAINTENANCE', 128, 136);
+    if (!plain) {
+      g.fillText('EXIT', 128, 110);
+      g.font = 'bold 18px Arial';
+      g.fillText('MAINTENANCE', 128, 136);
+    } else {
+      g.font = 'bold 22px Arial';
+      g.fillText('NO ENTRY', 128, 120);
+    }
     // rust drips
     g.fillStyle = 'rgba(110,55,20,0.35)';
     for (let i = 0; i < 8; i++) g.fillRect(20 + i * 29, 300 + (i % 3) * 20, 3, 120 + (i % 4) * 30);
@@ -483,7 +488,8 @@ registerRecipes({
   woodCrate,
   cardboard,
   exitSign,
-  metalDoor,
+  metalDoor: () => metalDoor(false),
+  metalDoorPlain: () => metalDoor(true),
   fireDoor,
   elevatorDoor,
   hazardStripe,

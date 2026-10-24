@@ -6,7 +6,7 @@
 
 import * as THREE from 'three';
 import { hashf, fbm2, RNG, hash32 } from '../core/rng.js';
-import { CN, CELL, F_SOLID, F_BLOCK, F_GLITCH, F_KEEP } from '../world/layout.js';
+import { CN, CELL, F_SOLID, F_BLOCK, F_GLITCH, F_KEEP, F_VOID } from '../world/layout.js';
 
 /**
  * Edge state for a lattice edge.
@@ -158,7 +158,7 @@ export function findOpenCell(L, rng, r = 1, tries = 60, filter = null) {
     let ok = true;
     for (let dz = -r; dz <= r && ok; dz++) {
       for (let dx = -r; dx <= r; dx++) {
-        if (L.flags[(lz + dz) * CN + lx + dx] & (F_SOLID | F_BLOCK | F_GLITCH | F_KEEP)) {
+        if (L.flags[(lz + dz) * CN + lx + dx] & (F_SOLID | F_BLOCK | F_GLITCH | F_KEEP | F_VOID)) {
           ok = false;
           break;
         }
@@ -175,7 +175,7 @@ export function findWallSpot(L, rng, tries = 80) {
     const lx = rng.int(2, CN - 3);
     const lz = rng.int(2, CN - 3);
     const f = L.flags[lz * CN + lx];
-    if (f & (F_SOLID | F_BLOCK | F_GLITCH)) continue;
+    if (f & (F_SOLID | F_BLOCK | F_GLITCH | F_VOID)) continue;
     const dirs = rng.shuffle([
       [1, 0],
       [-1, 0],

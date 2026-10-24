@@ -195,6 +195,7 @@ export class UI {
     row('Brightness', ...s);
     s = slider('renderScale', 0.4, 1, 0.05, pct);
     row('Render scale (performance)', ...s);
+    row('Auto resolution (keeps FPS up)', check('autoRes'));
     s = slider('viewDist', 1, 3, 1, (v) => ['', 'Near', 'Normal', 'Far'][v]);
     row('View distance', ...s);
     s = slider('headBob', 0, 1.5, 0.05, pct);

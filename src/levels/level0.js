@@ -2,7 +2,7 @@
 // Mono-yellow wallpaper, old moist carpet, fluorescent lights at maximum
 // hum-buzz and ~600 million square miles of randomly segmented rooms.
 
-import { CN, CELL, ChunkLayout, F_SOLID } from '../world/layout.js';
+import { CN, CELL, ChunkLayout, F_SOLID, F_VOID } from '../world/layout.js';
 import { Howler } from '../entities/howler.js';
 import { Smiler } from '../entities/smiler.js';
 import { fbm2, hashf, RNG, hash32 } from '../core/rng.js';
@@ -50,7 +50,9 @@ function params(seed) {
 }
 
 function darkness(Lx, Lz, seed) {
-  return fbm2(Lx / 7.5 + 100, Lz / 7.5 - 50, seed + 99, 3);
+  // never start a run in the dark: lights near the entry point always work
+  const near = Math.max(0, 1 - (Math.hypot(Lx, Lz) * 2.4) / 24);
+  return fbm2(Lx / 7.5 + 100, Lz / 7.5 - 50, seed + 99, 3) - near * 0.6;
 }
 
 export function generate(cx, cz, seed) {
@@ -139,6 +141,22 @@ export function generate(cx, cz, seed) {
       const gz = cz * CN + lz;
       const w = fbm2(gx / 26, gz / 26, seed + 404, 3);
       if (w > 0.66) L.matF[lz * CN + lx] = M.carpetWet;
+    }
+  }
+
+  // ---- rare pit rooms: a hole in the floor that goes down forever
+  for (let j = 0; j < per; j++) {
+    for (let i = 0; i < per; i++) {
+      const Lx = cx * per + i;
+      const Lz = cz * per + j;
+      if (Math.hypot(Lx, Lz) < 6 || hashf(Lx, Lz, seed, 515) > 0.012) continue;
+      for (let z = j * U + 2; z < j * U + 7; z++) {
+        for (let x = i * U + 2; x < i * U + 7; x++) {
+          if (L.get(x, z) & F_SOLID) continue;
+          L.or(x, z, F_VOID);
+          L.matF[z * CN + x] = M.wallDark;
+        }
+      }
     }
   }
 
@@ -367,6 +385,7 @@ export default {
   ambience,
   surfaceAt,
   defaultExit: 'level1',
+  fallTarget: 'level1',
   number: '0',
   name: 'The Lobby',
   survival: 'Class 1',

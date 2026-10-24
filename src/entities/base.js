@@ -2,11 +2,11 @@
 // field toward the player that every hunting entity can descend.
 
 import * as THREE from 'three';
-import { CELL, F_SOLID, F_BLOCK, F_GLITCH, F_NOAI } from '../world/layout.js';
+import { CELL, F_SOLID, F_BLOCK, F_GLITCH, F_NOAI, F_VOID } from '../world/layout.js';
 import { objectMaterial } from '../world/materials.js';
 import { clamp } from '../core/rng.js';
 
-const BLOCK = F_SOLID | F_BLOCK | F_GLITCH | F_NOAI;
+const BLOCK = F_SOLID | F_BLOCK | F_GLITCH | F_NOAI | F_VOID;
 
 /** BFS distance field (in cells) toward a target, around the target. */
 export class FlowField {
@@ -232,7 +232,7 @@ export class Entity {
       const gz1 = Math.floor((this.z + r) / CELL);
       for (let gz = gz0; gz <= gz1; gz++) {
         for (let gx = gx0; gx <= gx1; gx++) {
-          if (!(w.flagsG(gx, gz) & (F_SOLID | F_BLOCK | F_GLITCH))) continue;
+          if (!(w.flagsG(gx, gz) & (F_SOLID | F_BLOCK | F_GLITCH | F_VOID))) continue;
           const minX = gx * CELL;
           const minZ = gz * CELL;
           const cx = clamp(this.x, minX, minX + CELL);

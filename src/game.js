@@ -16,6 +16,7 @@ import { Player } from './player/player.js';
 import { Items, ITEM_NAMES } from './items.js';
 import { EntityManager } from './entities/base.js';
 import { ENTITY_TYPES } from './entities/index.js';
+import { Phantom } from './entities/phantom.js';
 import { getLevel } from './levels/index.js';
 import { loadSettings, saveSettings } from './core/settings.js';
 import { loadGame, saveGame, newGameState } from './core/save.js';
@@ -79,6 +80,7 @@ export class Game {
     this.applySettings();
     this.bindUI();
     this.input.onLockChange = (locked) => this.onLockChange(locked);
+    this.input.onFallback = () => this.toast('Mouse capture unavailable here: hold the left mouse button and drag to look.');
     window.addEventListener('resize', () => this.resize());
     this.resize();
     this.last = performance.now();
@@ -91,7 +93,8 @@ export class Game {
   resize() {
     const w = window.innerWidth;
     const h = window.innerHeight;
-    const pr = Math.min(window.devicePixelRatio || 1, 1.5) * this.settings.renderScale;
+    const scale = this.settings.autoRes ? this.dynScale ?? this.settings.renderScale : this.settings.renderScale;
+    const pr = Math.min(window.devicePixelRatio || 1, 1.25) * scale;
     this.renderer.setPixelRatio(pr);
     this.renderer.setSize(w, h, false);
     this.post.setSize(w, h, pr);
@@ -109,7 +112,10 @@ export class Game {
     this.ui.captions = s.captions;
     this.world.loadRadius = s.viewDist;
     if (key === 'vhs') this.setVHS(s.vhs);
-    if (key === 'renderScale') this.resize();
+    if (key === 'renderScale' || key === 'autoRes') {
+      this.dynScale = undefined;
+      this.resize();
+    }
     saveSettings(s);
   }
 
@@ -333,7 +339,7 @@ export class Game {
     this.mode = 'play';
     if (this.audio.ctx) this.audio.ctx.resume();
     this.input.lock();
-    if (!this.input.locked) this.ui.showClickToPlay('Click to continue');
+    if (!this.input.active) this.ui.showClickToPlay('Click to continue');
   }
 
   persist() {
@@ -482,6 +488,7 @@ export class Game {
     ];
     this.ui.showHUD(false);
     this.ui.setVHS(false);
+    this.ui.hideClickToPlay();
     this.ui.showDeath({
       cause,
       text: flavor[Math.floor(Math.random() * flavor.length)],
@@ -622,7 +629,7 @@ export class Game {
     this.ui.hideNote();
     if (this.mode === 'note') {
       this.mode = 'play';
-      if (!this.input.locked) this.ui.showClickToPlay('Click to continue');
+      if (!this.input.active) this.ui.showClickToPlay('Click to continue');
     }
   }
 
@@ -648,7 +655,7 @@ export class Game {
         } else {
           this.mode = 'play';
           this.input.lock();
-          if (!this.input.locked) this.ui.showClickToPlay('Click to continue');
+          if (!this.input.active) this.ui.showClickToPlay('Click to continue');
         }
       },
       onOpenNote: (n) => {
@@ -666,16 +673,23 @@ export class Game {
       if (this.debugFreeze > 0 && this.debugFreeze !== true) this.debugFreeze--;
       else return;
     }
-    let dt = (now - this.last) / 1000;
+    const raw = (now - this.last) / 1000;
     this.last = now;
-    if (!(dt > 0)) dt = 0.016;
+    let dt = raw > 0 ? raw : 0.016;
     dt = Math.min(dt, 0.05);
-    this.fps += (1 / dt - this.fps) * 0.05;
-    const t = now / 1000;
+    this.fps += (1 / Math.max(raw, 0.001) - this.fps) * 0.05;
+    this.simTime = now / 1000;
+    this.tick(dt);
+    this.adaptResolution(raw);
+    this.post.render(dt);
+  }
+
+  /** Advance the whole game by dt seconds (everything except rendering). */
+  tick(dt) {
+    const t = this.simTime;
     G.uTime.value = t;
     this.post.u.uTime.value = t;
     this.world.fixtures.update(t);
-
     switch (this.mode) {
       case 'menu':
         this.updateMenu(dt);
@@ -695,6 +709,9 @@ export class Game {
       case 'dead':
         this.fade = Math.min(0.75, this.fade + dt * 0.5);
         break;
+      case 'paused':
+        if (this.input.fallback && this.input.hit('pause')) this.resume();
+        break;
       case 'note':
         if (this.input.hit('interact') || this.input.hit('pause')) this.closeNote();
         this.updateAudio(dt);
@@ -704,7 +721,7 @@ export class Game {
           this.ui.hideJournal();
           this.mode = 'play';
           this.input.lock();
-          if (!this.input.locked) this.ui.showClickToPlay('Click to continue');
+          if (!this.input.active) this.ui.showClickToPlay('Click to continue');
         }
         break;
       default:
@@ -713,7 +730,35 @@ export class Game {
     if (this.mode !== 'play') this.input.consumeMouse();
     this.updateCameraAndFX(dt);
     this.input.endFrame();
-    this.post.render(dt);
+  }
+
+  /**
+   * Dynamic resolution: when frames take too long, render fewer pixels;
+   * when there is headroom, climb back toward the chosen render scale.
+   */
+  adaptResolution(raw) {
+    if (!this.settings.autoRes || this.mode === 'menu' || !(raw > 0) || raw > 0.5) return;
+    this.frameAvg = this.frameAvg ? this.frameAvg * 0.95 + raw * 0.05 : raw;
+    this.resT = (this.resT || 0) + raw;
+    if (this.resT < 1.5) return;
+    this.resT = 0;
+    const max = this.settings.renderScale;
+    let k = this.dynScale ?? max;
+    if (this.frameAvg > 1 / 45) k = Math.max(0.5, k - 0.1);
+    else if (this.frameAvg < 1 / 58) k = Math.min(max, k + 0.05);
+    if (Math.abs(k - (this.dynScale ?? max)) > 0.001) {
+      this.dynScale = k;
+      this.resize();
+    }
+  }
+
+  /** Debug/testing: fast-forward the simulation without rendering. */
+  debugSimulate(seconds, step = 1 / 30) {
+    for (let t = 0; t < seconds; t += step) {
+      this.simTime = (this.simTime || 0) + step;
+      this.tick(step);
+    }
+    return { mode: this.mode, level: this.level?.id, x: this.player.x, z: this.player.z, health: this.player.health };
   }
 
   /** Debug: spawn an entity in front of the player. */
@@ -780,7 +825,7 @@ export class Game {
         this.pendingIntro = false;
         setTimeout(() => this.ui.levelIntro(this.level), 900);
       }
-      if (!this.input.locked) this.ui.showClickToPlay('Click to look around');
+      if (!this.input.active) this.ui.showClickToPlay('Click to look around');
     }
   }
 
@@ -811,10 +856,10 @@ export class Game {
 
     // ---- look
     const [mdx, mdy] = inp.consumeMouse();
-    if (inp.locked) p.look(mdx, mdy);
+    if (inp.active) p.look(mdx, mdy);
 
     // ---- actions
-    if (inp.hit('pause') && inp.down.has('KeyP')) {
+    if (inp.hit('pause') && (inp.down.has('KeyP') || inp.fallback)) {
       this.input.unlock();
       this.pause();
       return;
@@ -1135,6 +1180,17 @@ export class Game {
       this.caption('[knocking]');
     } else if (r < 0.85 && s < 35) {
       this.blink = 1;
+    } else if (r < 0.95 && s < 40 && this.entities.count('phantom') < 1) {
+      // a figure at the edge of your vision
+      const f = this.camForward;
+      const side = Math.random() < 0.5 ? 1 : -1;
+      const ang = Math.atan2(f.x, f.z) + side * (0.75 + Math.random() * 0.35);
+      const d = 7 + Math.random() * 6;
+      const x = p.x + Math.sin(ang) * d;
+      const z = p.z + Math.cos(ang) * d;
+      if (this.world.los(p.x, p.z, x, z) && !(this.world.flagsAt(x, z) & (F_SOLID | F_BLOCK))) {
+        this.entities.add(new Phantom(this, x, z));
+      }
     } else {
       this.audio.play('static', { gain: 0.12, dur: 0.3 });
     }
