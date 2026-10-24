@@ -7,7 +7,7 @@ import { CN, CELL, ChunkLayout, F_SOLID, F_BLOCK } from '../world/layout.js';
 import { fbm2, hashf, RNG, hash32 } from '../core/rng.js';
 import { carveNetwork, findWallSpot, findOpenCell, chunkRng, addBox } from './common.js';
 import { cageBulb, pipe, valve, door, exitSign, wallQuad } from './props.js';
-import { exitStatic, ambientEvents } from './director.js';
+import { exitStatic, ambientEvents, exitCue } from './director.js';
 import { Smiler } from '../entities/smiler.js';
 import { Hound } from '../entities/hound.js';
 
@@ -222,6 +222,7 @@ function director(game, dt, S) {
   S.t = (S.t || 0) + dt;
   const p = game.player;
   const E = game.entities;
+  exitCue(game, dt, S, { type: 'door', sound: 'breath', opts: { gain: 0.8, dur: 1.8 }, every: 3.5, caption: '[cool air whistling under a door]' });
   ambientEvents(game, dt, S, {
     every: [9, 22],
     events: [

@@ -385,13 +385,14 @@ export class AudioEngine {
         burst('highpass', 3000, 0.5, 0.25, 0.18, 0.03);
         break;
       case 'metal': {
-        burst('bandpass', 900, 3, 0.4, 0.06);
+        thump();
+        burst('bandpass', 900, 3, 0.8, 0.06);
         for (const f of [430, 1170, 2310]) {
           const s = ctx.createOscillator();
           s.frequency.value = f * rand(0.97, 1.03);
           const g = ctx.createGain();
           s.connect(g).connect(o);
-          this.env(g, t, 0.002, 0.05, 0.3);
+          this.env(g, t, 0.002, 0.12, 0.3);
           s.start(t);
           s.stop(t + 0.35);
         }
@@ -583,7 +584,7 @@ export const SOUNDS = {
   },
   stinger(E, ctx, t, o) {
     // dissonant string-like stab
-    const out = E.out({ gain: o.gain ?? 0.35, wet: 0.8 });
+    const out = E.out({ gain: o.gain ?? 0.7, wet: 0.8 });
     const base = o.base ?? rand(180, 260);
     for (const r of [1, 1.06, 1.414, 1.5, 2.12]) {
       const s = osc(ctx, 'sawtooth', base * r);
@@ -932,7 +933,7 @@ export const SOUNDS = {
   },
   partyVoice(E, ctx, t, o) {
     // a cheerful, wrong, sing-song "ha-ha-ha =)"
-    const out = E.out({ gain: o.gain ?? 0.45, wet: 0.6, ...o });
+    const out = E.out({ wet: 0.6, ...o, gain: (o.gain ?? 0.45) * 1.8 });
     const notes = [660, 784, 660, 880];
     notes.forEach((f, i) => {
       const tt = t + i * 0.16;

@@ -6,7 +6,7 @@ import { CN, CELL, ChunkLayout, F_SOLID, F_BLOCK } from '../world/layout.js';
 import { fbm2, hashf, RNG, hash32 } from '../core/rng.js';
 import { rasterLattice, findWallSpot, findOpenCell, chunkRng, wallRuns } from './common.js';
 import { troffer, partition, desk, monitor, officeChair, waterCooler, door, wallQuad } from './props.js';
-import { ambientEvents } from './director.js';
+import { ambientEvents, exitCue } from './director.js';
 import { Faceling } from '../entities/faceling.js';
 
 const U = 16;
@@ -232,6 +232,7 @@ export function spawnPoint() {
 function director(game, dt, S) {
   S.t = (S.t || 0) + dt;
   const E = game.entities;
+  exitCue(game, dt, S, { type: 'door', sound: 'piano', opts: { gain: 0.35, notes: 3, lowpass: 900 }, every: 7, caption: '[faint music from a stairwell]' });
   ambientEvents(game, dt, S, {
     every: [25, 60],
     events: [

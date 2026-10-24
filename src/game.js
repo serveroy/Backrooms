@@ -12,6 +12,7 @@ import { PostFX } from './render/post.js';
 import { Input } from './core/input.js';
 import { AudioEngine } from './audio/audio.js';
 import { UI } from './ui/ui.js';
+import { TouchControls, isTouchDevice } from './ui/touch.js';
 import { Player } from './player/player.js';
 import { Items, ITEM_NAMES } from './items.js';
 import { EntityManager } from './entities/base.js';
@@ -80,8 +81,21 @@ export class Game {
     this.applySettings();
     this.bindUI();
     this.input.onLockChange = (locked) => this.onLockChange(locked);
+    if (isTouchDevice()) {
+      // no pointer lock on touch screens: look by dragging instead
+      this.touch = new TouchControls(uiRoot, this.input);
+      this.input.fallback = true;
+      uiRoot.classList.add('touch-mode');
+    }
     this.input.onFallback = () => this.toast('Mouse capture unavailable here: hold the left mouse button and drag to look.');
     window.addEventListener('resize', () => this.resize());
+    // browsers only allow sound after a gesture: start the menu's hum on the first click
+    const wake = () => {
+      this.audio.start();
+      if (this.mode === 'menu' && this.audio.ready && !this.audio.layers.hum) this.startAmbience(this.level);
+      window.removeEventListener('pointerdown', wake);
+    };
+    window.addEventListener('pointerdown', wake);
     this.resize();
     this.last = performance.now();
     this.enterMenu();
@@ -464,7 +478,7 @@ export class Game {
   }
 
   onEntityNoticed() {
-    this.audio.play('stinger', { gain: 0.3 });
+    this.audio.play('stinger', { gain: 0.6 });
     this.fear = Math.min(1, this.fear + 0.6);
   }
 
@@ -728,6 +742,10 @@ export class Game {
         break;
     }
     if (this.mode !== 'play') this.input.consumeMouse();
+    if (this.touch && this.touch.shown !== (this.mode === 'play')) {
+      this.touch.shown = this.mode === 'play';
+      this.touch.show(this.touch.shown);
+    }
     this.updateCameraAndFX(dt);
     this.input.endFrame();
   }

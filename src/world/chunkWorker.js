@@ -36,7 +36,7 @@ self.onmessage = (e) => {
     if (m.gen !== gen) return;
     const t0 = performance.now();
     try {
-      const { data, transfer } = buildChunkData(getLayout, level, m.cx, m.cz, matSizes);
+      const { data, transfer } = buildChunkData(getLayout, level, m.cx, m.cz, matSizes, { sendLayout: true });
       data.gen = gen;
       data.ms = performance.now() - t0;
       self.postMessage({ type: 'built', data }, transfer);

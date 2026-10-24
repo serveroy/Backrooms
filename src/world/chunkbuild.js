@@ -18,7 +18,7 @@ export function makeLayout(level, cx, cz, seed) {
   return L;
 }
 
-export function buildChunkData(getLayout, level, cx, cz, matSizes) {
+export function buildChunkData(getLayout, level, cx, cz, matSizes, opts = {}) {
   const cfg = level.config;
   const L = getLayout(cx, cz);
   const region = new Region(getLayout, cx, cz);
@@ -119,5 +119,11 @@ export function buildChunkData(getLayout, level, cx, cz, matSizes) {
   // keep only the chunk-sized part of the ambient grid for light probes
   const amb = { a: A.a, open: A.open, D: A.D, ox: A.ox, oz: A.oz };
   transfer.push(amb.a.buffer, amb.open.buffer);
-  return { data: { cx, cz, meshes, dynKeys, ambient: amb }, transfer };
+  // fixture definitions for the live slots, so the main thread doesn't have
+  // to regenerate neighbouring layouts just to look them up
+  const dynFixtures = dynKeys.map((k) => {
+    const f = region.fixtures.find((q) => q.key === k);
+    return f ? { key: f.key, x: f.x, y: f.y, z: f.z, color: f.color, power: f.power, mode: f.mode, period: f.period, sync: f.sync, level: f.level, hum: f.hum, radius: f.radius } : null;
+  });
+  return { data: { cx, cz, meshes, dynKeys, dynFixtures, layout: opts.sendLayout ? L : null, ambient: amb }, transfer };
 }

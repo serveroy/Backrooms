@@ -7,7 +7,7 @@ import { CN, CELL, ChunkLayout, F_SOLID, F_BLOCK } from '../world/layout.js';
 import { fbm2, hashf, RNG, hash32 } from '../core/rng.js';
 import { carveNetwork, findWallSpot, findOpenCell, chunkRng, wallRuns, addBox } from './common.js';
 import { sconce, chandelier, door, wallQuad, pianoProp, table } from './props.js';
-import { ambientEvents } from './director.js';
+import { ambientEvents, exitCue } from './director.js';
 import { Faceling } from '../entities/faceling.js';
 
 const U = 16;
@@ -258,6 +258,7 @@ function director(game, dt, S) {
   S.t = (S.t || 0) + dt;
   const p = game.player;
   const E = game.entities;
+  exitCue(game, dt, S, { type: 'door', sound: 'boom', opts: { gain: 0.45 }, every: 6, caption: '[a boiler rumbling]' });
   ambientEvents(game, dt, S, {
     every: [20, 45],
     events: [

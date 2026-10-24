@@ -111,3 +111,24 @@ export function ambientEvents(game, dt, S, cfg) {
       break;
   }
 }
+
+/**
+ * A faint recurring sound at the nearest exit of a type, so doors can be
+ * found by ear like Level 0's static. cue: { type, sound, opts, every, range, caption }
+ */
+export function exitCue(game, dt, S, cue) {
+  const key = 'cue_' + cue.type;
+  S[key] = (S[key] ?? 2) - dt;
+  if (S[key] > 0) return;
+  S[key] = cue.every ?? 4;
+  const p = game.player;
+  const ex = game.nearestExit(p.x, p.z, cue.type);
+  if (!ex) return;
+  const d = Math.hypot(ex.x - p.x, ex.z - p.z);
+  if (d > (cue.range ?? 40)) return;
+  game.audio.play(cue.sound, { pos: [ex.x, 1.4, ex.z], ref: 3, rolloff: 0.9, ...(cue.opts || {}) });
+  if (d < 12 && cue.caption && !S[key + 'cap']) {
+    S[key + 'cap'] = true;
+    game.caption(cue.caption);
+  }
+}

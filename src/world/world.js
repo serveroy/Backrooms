@@ -3,7 +3,7 @@
 // physics, AI and lighting probes.
 
 import * as THREE from 'three';
-import { CN, CELL, CHUNK, F_SOLID, F_BLOCK, F_GLITCH, F_VOID, F_WATER, chunkKey } from './layout.js';
+import { CN, CELL, CHUNK, F_SOLID, F_BLOCK, F_GLITCH, F_VOID, F_WATER, chunkKey, ChunkLayout } from './layout.js';
 import { isDynamicFixture, sampleAmbient } from './bake.js';
 import { buildChunkData, makeLayout } from './chunkbuild.js';
 import ChunkWorker from './chunkWorker.js?worker&inline';
@@ -310,13 +310,23 @@ export class World {
   addChunk(d) {
     const key = chunkKey(d.cx, d.cz);
     if (this.chunks.has(key)) return;
+    // adopt the worker's copy of the layout unless we already generated one
+    const lk = chunkKey(d.cx, d.cz);
+    if (d.layout && !this.layouts.has(lk)) {
+      Object.setPrototypeOf(d.layout, ChunkLayout.prototype);
+      this.layouts.set(lk, d.layout);
+    }
     const chunk = { cx: d.cx, cz: d.cz, meshes: [], slotKeys: [], ambient: d.ambient, layout: this.getLayout(d.cx, d.cz) };
     // resolve dynamic fixture keys to texture slots
     const slots = new Float32Array(d.dynKeys.length);
     for (let i = 0; i < d.dynKeys.length; i++) {
       const fk = d.dynKeys[i];
-      const [fx, fz, fi] = fk.split(',').map(Number);
-      const f = this.getLayout(fx, fz).fixtures[fi];
+      let f = this.fixtures.byKey.get(fk)?.f;
+      if (!f) {
+        const [fx, fz, fi] = fk.split(',').map(Number);
+        const known = this.layouts.get(chunkKey(fx, fz));
+        f = known ? known.fixtures[fi] : d.dynFixtures && d.dynFixtures[i];
+      }
       const s = f ? this.fixtures.acquire(f) : -1;
       slots[i] = s;
       if (s >= 0) chunk.slotKeys.push(fk);

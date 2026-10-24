@@ -170,8 +170,14 @@ export class Player {
       if (input.is('left')) fx -= 1;
       if (input.is('right')) fx += 1;
     }
+    // analog stick (touch controls)
+    const st = input && input.stick;
+    if (!this.frozen && st && Math.abs(st.x) + Math.abs(st.y) > 0.12) {
+      fx = st.x;
+      fz = -st.y;
+    }
     const len = Math.hypot(fx, fz);
-    if (len > 0) {
+    if (len > 1) {
       fx /= len;
       fz /= len;
     }

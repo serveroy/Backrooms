@@ -6,7 +6,7 @@ import { CN, CELL, ChunkLayout, F_SOLID, F_BLOCK } from '../world/layout.js';
 import { fbm2, hashf, RNG, hash32 } from '../core/rng.js';
 import { rasterLattice, findWallSpot, findOpenCell, chunkRng, addBox } from './common.js';
 import { hangingTube, pipe, electricalBox, door, wallQuad } from './props.js';
-import { ambientEvents } from './director.js';
+import { ambientEvents, exitCue } from './director.js';
 import { Smiler } from '../entities/smiler.js';
 import { Hound } from '../entities/hound.js';
 import { SkinStealer } from '../entities/skinstealer.js';
@@ -257,6 +257,7 @@ function director(game, dt, S) {
   S.t = (S.t || 0) + dt;
   const p = game.player;
   const E = game.entities;
+  exitCue(game, dt, S, { type: 'door', sound: 'ding', opts: { gain: 0.4 }, every: 9, range: 45, caption: '[an elevator chime]' });
   ambientEvents(game, dt, S, {
     every: [8, 18],
     events: [

@@ -7,7 +7,7 @@ import { CN, CELL, ChunkLayout, F_SOLID, F_BLOCK } from '../world/layout.js';
 import { fbm2, hashf, RNG, hash32 } from '../core/rng.js';
 import { rasterLattice, findWallSpot, findOpenCell, addBox, chunkRng } from './common.js';
 import { hangingTube, crateStack, cardboardStack, door, exitSign, shelf, pipe, wallQuad } from './props.js';
-import { exitStatic, ambientEvents } from './director.js';
+import { exitStatic, ambientEvents, exitCue } from './director.js';
 import { Hound } from '../entities/hound.js';
 import { Deathmoth } from '../entities/deathmoth.js';
 import { Faceling } from '../entities/faceling.js';
@@ -269,6 +269,7 @@ function director(game, dt, S) {
   S.t = (S.t || 0) + dt;
   const E = game.entities;
   const p = game.player;
+  exitCue(game, dt, S, { type: 'door', sound: 'knock', opts: { gain: 0.5, count: 2 }, every: 5, caption: '[machinery thumping behind a door]' });
   ambientEvents(game, dt, S, {
     every: [14, 32],
     events: [
