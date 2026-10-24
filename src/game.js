@@ -5,6 +5,8 @@ import * as THREE from 'three';
 import { World } from './world/world.js';
 import { G } from './world/materials.js';
 import { setAnisotropy } from './world/textures.js';
+import './world/textures_industrial.js';
+import './world/textures_interior.js';
 import { CELL, F_GLITCH, F_SOLID, F_BLOCK } from './world/layout.js';
 import { PostFX } from './render/post.js';
 import { Input } from './core/input.js';
@@ -13,6 +15,7 @@ import { UI } from './ui/ui.js';
 import { Player } from './player/player.js';
 import { Items, ITEM_NAMES } from './items.js';
 import { EntityManager } from './entities/base.js';
+import { ENTITY_TYPES } from './entities/index.js';
 import { getLevel } from './levels/index.js';
 import { loadSettings, saveSettings } from './core/settings.js';
 import { loadGame, saveGame, newGameState } from './core/save.js';
@@ -71,6 +74,7 @@ export class Game {
     this.camPose = {};
     this.fps = 60;
     this.levelState = {};
+    this.lightScale = 1;
     this.vhsOn = this.settings.vhs;
     this.applySettings();
     this.bindUI();
@@ -241,6 +245,8 @@ export class Game {
     this.entities.clear();
     this.items.clear();
     this.interactables.clear();
+    this.clearLevelObjects();
+    this.redTint = 0;
     this.level = level;
     this.levelState = {};
     this.levelTime = 0;
@@ -277,7 +283,7 @@ export class Game {
     const c = level.config;
     G.uFogColor.value.setRGB(...c.fogColor);
     G.uFogDensity.value = c.fogDensity;
-    G.uLightScale.value = 1;
+    this.setLightScale(1);
     const g = c.grade || {};
     this.post.u.uTint.value.set(...(g.tint || [1, 1, 1]));
     this.post.u.uSat.value = g.saturation ?? 1;
@@ -285,6 +291,9 @@ export class Game {
     this.baseExposure = c.exposure ?? 1;
     this.post.u.uVignette.value = c.vignette ?? 0.32;
     this.scene.background = new THREE.Color(...c.fogColor);
+    G.uWaterLevel.value = c.waterLevel ?? -999;
+    this.points = [];
+    for (const v of G.uPointPos.value) v.w = 0;
     this.camera.far = c.far ?? 140;
     this.camera.updateProjectionMatrix();
   }
@@ -338,9 +347,10 @@ export class Game {
 
   onChunkInteract(chunk, added) {
     const L = chunk.layout;
+    const used = (this.state && this.state.picked && this.state.picked[this.level.id]) || [];
     L.interact.forEach((it, i) => {
-      const id = `${L.cx},${L.cz},${i}`;
-      if (added) this.interactables.set(id, { ...it, id });
+      const id = `i:${L.cx},${L.cz},${i}`;
+      if (added) this.interactables.set(id, { ...it, id, used: used.includes(id) });
       else this.interactables.delete(id);
     });
   }
@@ -350,6 +360,7 @@ export class Game {
     let bs = -1;
     for (const it of this.interactables.values()) {
       if (it.used && it.once) continue;
+      if (it.hidden) continue;
       const y = it.y ?? 1.0;
       const dx = it.x - eye.x;
       const dy = y - eye.y;
@@ -370,6 +381,51 @@ export class Game {
 
   toast(msg) {
     this.ui.toast(msg);
+  }
+
+  /** Scene objects owned by the current level (removed on level change). */
+  addLevelObject(obj) {
+    this.levelObjects = this.levelObjects || [];
+    this.levelObjects.push(obj);
+    this.scene.add(obj);
+  }
+
+  clearLevelObjects() {
+    for (const o of this.levelObjects || []) this.scene.remove(o);
+    this.levelObjects = [];
+  }
+
+  /** Brief dynamic point light (sparks, muzzle of a flare...). */
+  flashPoint(x, y, z, color, radius = 5, dur = 0.2) {
+    this.points = this.points || [];
+    this.points.push({ x, y, z, color, radius, t: dur, dur });
+    if (this.points.length > 4) this.points.shift();
+  }
+
+  updatePoints(dt) {
+    const P = G.uPointPos.value;
+    const C = G.uPointCol.value;
+    const list = this.points || [];
+    for (let i = list.length - 1; i >= 0; i--) {
+      list[i].t -= dt;
+      if (list[i].t <= 0) list.splice(i, 1);
+    }
+    for (let i = 0; i < 4; i++) {
+      const p = list[i];
+      if (!p) {
+        P[i].w = 0;
+        continue;
+      }
+      const k = (p.t / p.dur) * (Math.random() < 0.3 ? 0.4 : 1);
+      P[i].set(p.x, p.y, p.z, p.radius);
+      C[i].set(p.color[0] * k, p.color[1] * k, p.color[2] * k);
+    }
+  }
+
+  /** Global multiplier on all fixture light (blackouts). */
+  setLightScale(k) {
+    this.lightScale = k;
+    G.uLightScale.value = k;
   }
 
   caption(msg) {
@@ -660,6 +716,18 @@ export class Game {
     this.post.render(dt);
   }
 
+  /** Debug: spawn an entity in front of the player. */
+  debugSpawn(name, dist = 4, opts = {}) {
+    const C = ENTITY_TYPES[name];
+    const p = this.player;
+    const x = p.x - Math.sin(p.yaw) * dist;
+    const z = p.z - Math.cos(p.yaw) * dist;
+    const e = this.entities.add(new C(this, x, z, opts));
+    if (opts.state) e.setState(opts.state);
+    e.yaw = p.yaw + Math.PI;
+    return e;
+  }
+
   /** Debug: render one frame and return the canvas as a data URL. */
   snapshot(type = 'image/jpeg') {
     this.updateCameraAndFX(0.016);
@@ -830,6 +898,7 @@ export class Game {
       else du[i].set(0, 0, 0, 0);
     }
     this.fear = Math.max(0, this.fear - dt * 0.08);
+    this.updatePoints(dt);
 
     // ---- autosave
     this.saveT -= dt;
@@ -846,14 +915,71 @@ export class Game {
     if (this.level.objective) this.ui.setObjective(this.level.objective(this));
   }
 
+  markUsed(it) {
+    it.used = true;
+    const st = this.state;
+    (st.picked[this.level.id] ||= []).push(it.id);
+  }
+
   useInteractable(it) {
     const L = this.level;
     if (L.interactHandler && L.interactHandler(this, it) !== false) return;
+    const inv = this.state.inv;
     switch (it.type) {
       case 'exit':
+        if (it.locked) {
+          this.toast(it.lockedMsg || 'It won\'t budge.');
+          this.audio.play('knock', { count: 1, gain: 0.3 });
+          return;
+        }
         it.used = true;
         this.transition(it.target, it.kind || 'door');
         break;
+      case 'crate': {
+        if (it.used) {
+          this.toast('Empty.');
+          return;
+        }
+        this.markUsed(it);
+        this.audio.play('creak', { dur: 0.5, gain: 0.25 });
+        const table = L.config.loot || [['almond', 1]];
+        const n = 1 + (Math.random() < 0.45 ? 1 : 0);
+        const got = [];
+        for (let k = 0; k < n; k++) {
+          let tot = 0;
+          for (const e of table) tot += e[1];
+          let r = Math.random() * tot;
+          let pick = table[0][0];
+          for (const e of table) {
+            r -= e[1];
+            if (r <= 0) {
+              pick = e[0];
+              break;
+            }
+          }
+          if (pick === 'almond' && inv.almond >= 6) pick = 'battery';
+          inv[pick] = (inv[pick] || 0) + 1;
+          got.push(ITEM_NAMES[pick]);
+        }
+        this.audio.play('pickup');
+        this.toast('Found: ' + got.join(', '));
+        break;
+      }
+      case 'cooler': {
+        if (it.used) {
+          this.toast('The jug is empty.');
+          return;
+        }
+        if (inv.almond >= 6) {
+          this.toast("You can't carry more Almond Water");
+          return;
+        }
+        this.markUsed(it);
+        inv.almond++;
+        this.audio.play('drink', { gain: 0.3 });
+        this.toast('Filled a bottle with Almond Water');
+        break;
+      }
       default:
         break;
     }

@@ -85,7 +85,7 @@ export class Player {
     const fy = w.floorG(gx, gz);
     if (fy > y + 0.42 && !(this.swimming && fy < w.waterG(gx, gz) + 0.3)) return true;
     const cy = w.ceilG(gx, gz);
-    if (cy - Math.max(fy, y) < (this.crouching ? CROUCH_H : CROUCH_H) + 0.02) return true;
+    if (cy - Math.max(fy, y) < (this.crouching ? CROUCH_H : STAND_H) + 0.02) return true;
     return false;
   }
 

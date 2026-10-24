@@ -92,6 +92,10 @@ export function ambientEvents(game, dt, S, cfg) {
       au.play('growl', { pos: far, gain: 0.35 });
       game.caption('[a low growl]');
       break;
+    case 'phone':
+      au.play('phone', { pos: far, gain: 0.3 });
+      game.caption('[a phone ringing somewhere]');
+      break;
     case 'piano':
       au.play('piano', { pos: far, gain: 0.25 });
       break;

@@ -67,6 +67,7 @@ export function edgeState(P, ori, Lx, Lz) {
 /** Rasterize the lattice maze into a chunk layout. */
 export function rasterLattice(L, P) {
   const U = P.U;
+  if (CN % U) throw new Error('lattice unit must divide the chunk size');
   const per = CN / U;
   const cx = L.cx;
   const cz = L.cz;
@@ -280,3 +281,109 @@ export function chunkRng(L, seed, salt) {
 }
 
 export { fbm2, hashf };
+
+// ---------------------------------------------------------------- corridor network
+//
+// Everything starts solid; corridors are carved between lattice nodes.
+// Edge decisions hash global node coordinates so chunks agree, and an
+// isolated node always opens its own east edge.
+
+function rawEdge(P, ori, i, j) {
+  return hashf(i, j, P.seed, ori === 'e' ? 1301 : 1302) < P.edgeChance(i, j);
+}
+
+export function netEdge(P, ori, i, j) {
+  if (rawEdge(P, ori, i, j)) return true;
+  if (ori === 'e') {
+    const isolated = !rawEdge(P, 'e', i - 1, j) && !rawEdge(P, 'n', i, j) && !rawEdge(P, 'n', i, j - 1);
+    if (isolated) return true;
+  }
+  return false;
+}
+
+export function netEdgeWidth(P, ori, i, j) {
+  const h = hashf(i, j, P.seed, ori === 'e' ? 1401 : 1402);
+  return P.widths[Math.floor(h * P.widths.length)];
+}
+
+/**
+ * Carve a corridor network into a layout.
+ * P: { U, seed, edgeChance(i,j), widths:[cells], nodeSize(i,j) -> cells, roomChance }
+ * Returns the list of carved straight segments (local cell rects) for decoration.
+ */
+export function carveNetwork(L, P) {
+  const U = P.U;
+  if (CN % U) throw new Error('lattice unit must divide the chunk size');
+  const per = CN / U;
+  L.flags.fill(F_SOLID);
+  const segs = [];
+  const carve = (x0, z0, x1, z1) => {
+    for (let z = Math.max(0, z0); z < Math.min(CN, z1); z++) {
+      for (let x = Math.max(0, x0); x < Math.min(CN, x1); x++) L.flags[z * CN + x] &= ~F_SOLID;
+    }
+  };
+  const c = Math.floor(U / 2);
+  for (let j = -1; j <= per; j++) {
+    for (let i = -1; i <= per; i++) {
+      const gi = L.cx * per + i;
+      const gj = L.cz * per + j;
+      const nx = i * U + c;
+      const nz = j * U + c;
+      // node
+      const ns = P.nodeSize ? P.nodeSize(gi, gj) : 6;
+      const h = Math.floor(ns / 2);
+      carve(nx - h, nz - h, nx - h + ns, nz - h + ns);
+      if (ns > 6) segs.push({ room: true, x0: nx - h, z0: nz - h, x1: nx - h + ns, z1: nz - h + ns, gi, gj });
+      // east edge
+      if (netEdge(P, 'e', gi, gj)) {
+        const w = netEdgeWidth(P, 'e', gi, gj);
+        const hw = Math.floor(w / 2);
+        carve(nx, nz - hw, nx + U, nz - hw + w);
+        segs.push({ axis: 'x', x0: nx, z0: nz - hw, x1: nx + U, z1: nz - hw + w, gi, gj });
+      }
+      // north edge
+      if (netEdge(P, 'n', gi, gj)) {
+        const w = netEdgeWidth(P, 'n', gi, gj);
+        const hw = Math.floor(w / 2);
+        carve(nx - hw, nz, nx - hw + w, nz + U);
+        segs.push({ axis: 'z', x0: nx - hw, z0: nz, x1: nx - hw + w, z1: nz + U, gi, gj });
+      }
+    }
+  }
+  return segs;
+}
+
+/**
+ * Straight runs of wall faces inside the chunk.
+ * Returns [{ lx, lz, dx, dz, len }] where (lx, lz) is the first open cell
+ * of the run, (dx, dz) points into the wall and the run extends along +x
+ * (for walls facing z) or +z (for walls facing x).
+ */
+export function wallRuns(L, minLen = 3, blockMask = F_SOLID | F_BLOCK | F_GLITCH) {
+  const runs = [];
+  const open = (x, z) => x >= 0 && z >= 0 && x < CN && z < CN && !(L.flags[z * CN + x] & blockMask);
+  const solid = (x, z) => x < 0 || z < 0 || x >= CN || z >= CN || (L.flags[z * CN + x] & F_SOLID) !== 0;
+  for (const [dx, dz] of [
+    [1, 0],
+    [-1, 0],
+    [0, 1],
+    [0, -1],
+  ]) {
+    const alongX = dz !== 0;
+    for (let a = 0; a < CN; a++) {
+      let start = -1;
+      for (let b = 0; b <= CN; b++) {
+        const x = alongX ? b : a;
+        const z = alongX ? a : b;
+        const ok = b < CN && open(x, z) && solid(x + dx, z + dz) && x + dx >= 0 && z + dz >= 0 && x + dx < CN && z + dz < CN;
+        if (ok && start < 0) start = b;
+        if (!ok && start >= 0) {
+          const len = b - start;
+          if (len >= minLen) runs.push({ lx: alongX ? start : a, lz: alongX ? a : start, dx, dz, len });
+          start = -1;
+        }
+      }
+    }
+  }
+  return runs;
+}

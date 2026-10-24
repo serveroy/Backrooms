@@ -1017,6 +1017,30 @@ export const SOUNDS = {
       }
     }
   },
+  phone(E, ctx, t, o) {
+    // an old office phone ringing somewhere
+    const out = E.out({ gain: o.gain ?? 0.2, wet: 0.7, lowpass: 2500, ...o });
+    for (let r = 0; r < (o.rings ?? 2); r++) {
+      const t0 = t + r * 3;
+      for (const f of [440, 480]) {
+        const s = osc(ctx, 'sine', f);
+        const g = ctx.createGain();
+        const am = osc(ctx, 'square', 20);
+        const ag = ctx.createGain();
+        ag.gain.value = 0.5;
+        am.connect(ag).connect(g.gain);
+        s.connect(g).connect(out);
+        g.gain.setValueAtTime(0.0001, t0);
+        g.gain.linearRampToValueAtTime(0.4, t0 + 0.02);
+        g.gain.setValueAtTime(0.4, t0 + 1.9);
+        g.gain.linearRampToValueAtTime(0.0001, t0 + 2.0);
+        s.start(t0);
+        am.start(t0);
+        s.stop(t0 + 2.05);
+        am.stop(t0 + 2.05);
+      }
+    }
+  },
   door(E, ctx, t, o) {
     SOUNDS.creak(E, ctx, t, { dur: 0.9, gain: 0.3, ...o });
     SOUNDS.knock(E, ctx, t + 0.85, { count: 1, gain: 0.35, ...o });

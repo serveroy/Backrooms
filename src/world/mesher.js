@@ -2,7 +2,7 @@
 // by material slot. Vertices are shared along continuous surfaces so the
 // per-vertex baked lighting interpolates smoothly.
 
-import { CN, CELL, F_SOLID, F_GLITCH, F_VOID, F_NOCEIL } from './layout.js';
+import { CN, CELL, F_SOLID, F_GLITCH, F_VOID, F_NOCEIL, F_WATER } from './layout.js';
 import { RW } from './region.js';
 import { GeoBuilder } from './geobuilder.js';
 
@@ -99,6 +99,22 @@ export function meshChunk(region, layout, mats, opts = {}) {
         const c = vtx(gx0 + lx + 1, gz0 + lz + 1);
         const d = vtx(gx0 + lx + 1, gz0 + lz);
         b.quad(a, bb, c, d);
+      }
+
+      // ---- water surface
+      if (f & F_WATER && region.waterY) {
+        const wy = region.waterY[ri];
+        if (wy > yF + 0.01) {
+          const b = B('a' + (opts.waterMat ?? 0));
+          const yq = Math.round(wy * 100) + 50000;
+          const key = (cx, cz) => ((cx - gx0 + 1) * 70 + (cz - gz0 + 1)) * 100000 + yq;
+          const vtx = (gx, gz) => b.vk(key(gx, gz), gx * CELL, wy, gz * CELL, 0, 1, 0, gx * CELL, gz * CELL, 1);
+          const a = vtx(gx0 + lx, gz0 + lz);
+          const bb = vtx(gx0 + lx, gz0 + lz + 1);
+          const c = vtx(gx0 + lx + 1, gz0 + lz + 1);
+          const d = vtx(gx0 + lx + 1, gz0 + lz);
+          b.quad(a, bb, c, d);
+        }
       }
 
       // ---- ceiling

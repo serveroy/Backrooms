@@ -8,7 +8,7 @@ import { isDynamicFixture, sampleAmbient } from './bake.js';
 import { buildChunkData, makeLayout } from './chunkbuild.js';
 import ChunkWorker from './chunkWorker.js?worker&inline';
 import { FixtureSystem } from './fixtures.js';
-import { worldMaterial } from './materials.js';
+import { worldMaterial, waterMaterial } from './materials.js';
 import { getTexture } from './textures.js';
 
 export class World {
@@ -44,6 +44,7 @@ export class World {
       this.materials.push(worldMaterial(def));
     }
     this.fixtureMaterial = worldMaterial({ ...(level.fixtureMaterial || {}), tex: level.fixtureMaterial?.tex || 'troffer', fixture: true, grime: [0, 0, 1, 1] });
+    this.waterMaterial = level.water ? waterMaterial(level.water) : null;
     this.startStreaming();
   }
 
@@ -347,13 +348,17 @@ export class World {
         geo.setAttribute('aEmit', new THREE.BufferAttribute(m.emit, 3));
         geo.setAttribute('aFix', new THREE.BufferAttribute(m.fix, 1));
         mat = this.fixtureMaterial;
+      } else if (m.key[0] === 'a') {
+        mat = this.waterMaterial;
       } else {
         const slot = parseInt(m.key.slice(1), 10);
         mat = this.materials[slot] || this.materials[0];
       }
       geo.computeBoundingSphere();
+      if (!mat) continue;
       const mesh = new THREE.Mesh(geo, mat);
       mesh.matrixAutoUpdate = false;
+      if (m.key[0] === 'a') mesh.renderOrder = 2;
       this.group.add(mesh);
       chunk.meshes.push(mesh);
     }

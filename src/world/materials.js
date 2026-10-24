@@ -32,6 +32,7 @@ export const G = {
   uPointPos: { value: Array.from({ length: MAX_POINTS }, () => new THREE.Vector4(0, 0, 0, 0)) },
   uPointCol: { value: Array.from({ length: MAX_POINTS }, () => new THREE.Vector3(0, 0, 0)) },
   uGrimeTex: { value: null },
+  uWaterLevel: { value: -999 },
 };
 
 const COMMON = /* glsl */ `
@@ -174,6 +175,8 @@ uniform vec3 uTint;
 uniform vec4 uGrime;      // x: stain strength, y: dirt strength, z: stain scale, w: dirt scale
 uniform vec3 uStainColor;
 uniform float uDamp;      // rising damp near the floor (walls)
+uniform float uCaustic;
+uniform float uWaterLevel;
 uniform float uSpec;      // fake wet sheen strength
 uniform vec3 uEmissive;
 varying vec3 vLight;
@@ -203,6 +206,16 @@ void main() {
   albedo *= 1.0 + (dirt - 0.5) * uGrime.y + (fine - 0.5) * uGrime.y * 0.4;
 
   vec3 light = vLight + flashlight(wp, n) + pointLights(wp, n);
+  if (uCaustic > 0.0 && wp.y < uWaterLevel - 0.03) {
+    // dancing pool caustics on submerged surfaces
+    vec2 q = wp.xz * 2.3 + vec2(wp.y * 0.7);
+    float t = uTime * 0.6;
+    float c1 = sin(q.x * 3.1 + t * 1.7 + sin(q.y * 2.3 + t)) + sin(q.y * 3.7 - t * 1.3 + sin(q.x * 1.9 - t * 0.7));
+    float c = pow(max(0.0, 1.0 - abs(c1) * 0.6), 6.0);
+    light *= 0.85;
+    light += vLight * c * uCaustic;
+    albedo *= vec3(0.82, 0.95, 1.0);
+  }
   vec3 col = albedo * light;
   #ifdef FIXTURE
     col += vEmit * tex.rgb;
@@ -252,20 +265,23 @@ uniform vec3 uObjLight;
 uniform vec3 uEmissive;
 uniform float uOpacity;
 uniform float uRim;
+uniform float uAlphaTest;
 varying vec3 vWorldPos;
 varying vec3 vNormalW;
 varying vec2 vUv;
 void main() {
   vec3 n = normalize(vNormalW);
+  if (!gl_FrontFacing) n = -n;
   vec3 wp = vWorldPos;
   vec4 tex = texture2D(map, vUv);
+  if (tex.a < uAlphaTest) discard;
   vec3 albedo = tex.rgb * uTint;
   float hemi = 0.5 + 0.5 * n.y;
   vec3 light = uObjLight * (0.45 + 0.55 * hemi) * uLightScale * disturbance(wp) + flashlight(wp, n) + pointLights(wp, n);
   vec3 col = albedo * light + uEmissive * tex.rgb;
   if (uRim > 0.0) {
     vec3 v = normalize(cameraPosition - wp);
-    col += uObjLight * pow(1.0 - max(dot(v, n), 0.0), 3.0) * uRim;
+    col += uObjLight * pow(1.0 - max(dot(v, n), 0.0), 4.0) * uRim * (0.5 + 0.5 * hemi);
   }
   col = applyFog(col, distance(cameraPosition, wp));
   gl_FragColor = vec4(col, uOpacity * tex.a);
@@ -299,6 +315,7 @@ export function worldMaterial(def) {
       uSpec: { value: def.spec ?? 0 },
       uEmissive: { value: new THREE.Color(...(def.emissive || [0, 0, 0])) },
       uWarp: { value: def.warp ?? 1 },
+      uCaustic: { value: def.caustic ?? 0 },
     },
     side: def.doubleSide ? THREE.DoubleSide : THREE.FrontSide,
   });
@@ -319,6 +336,7 @@ export function objectMaterial(opts = {}) {
       uEmissive: { value: new THREE.Color(...(opts.emissive || [0, 0, 0])) },
       uOpacity: { value: opts.opacity ?? 1 },
       uRim: { value: opts.rim ?? 0 },
+      uAlphaTest: { value: opts.alphaTest ?? 0 },
     },
     transparent: !!opts.transparent,
     depthWrite: opts.depthWrite ?? !opts.transparent,
@@ -367,5 +385,64 @@ export function glowMaterial(opts = {}) {
     depthWrite: false,
     blending: THREE.AdditiveBlending,
     side: THREE.DoubleSide,
+  });
+}
+
+const WATER_FRAG = /* glsl */ `
+${COMMON}
+${FRAG_LIGHTS}
+uniform vec3 uDeep;
+uniform vec3 uShallow;
+uniform vec3 uReflect;
+uniform float uClarity;
+uniform float uSpecular;
+varying vec3 vLight;
+varying vec3 vWorldPos;
+varying vec3 vNormalW;
+varying vec2 vUv;
+
+vec3 waveNormal(vec2 p, float t) {
+  float e = 0.05;
+  float h0 = sin(p.x * 3.0 + t * 1.3) * 0.5 + sin(p.y * 2.6 - t * 1.1) * 0.5 + sin((p.x + p.y) * 5.3 + t * 2.1) * 0.25;
+  float hx = sin((p.x + e) * 3.0 + t * 1.3) * 0.5 + sin(p.y * 2.6 - t * 1.1) * 0.5 + sin((p.x + e + p.y) * 5.3 + t * 2.1) * 0.25;
+  float hz = sin(p.x * 3.0 + t * 1.3) * 0.5 + sin((p.y + e) * 2.6 - t * 1.1) * 0.5 + sin((p.x + p.y + e) * 5.3 + t * 2.1) * 0.25;
+  return normalize(vec3(-(hx - h0) / e * 0.04, 1.0, -(hz - h0) / e * 0.04));
+}
+
+void main() {
+  vec3 wp = vWorldPos;
+  vec3 n = waveNormal(wp.xz, uTime);
+  vec3 v = normalize(cameraPosition - wp);
+  float fres = 0.04 + 0.96 * pow(1.0 - max(dot(v, n), 0.0), 5.0);
+  vec3 L = vLight;
+  vec3 body = mix(uShallow, uDeep, 1.0 - uClarity) * (L + 0.02);
+  vec3 refl = uReflect * (0.6 + 0.4 * dot(L, vec3(0.33)));
+  vec3 col = mix(body, refl, fres);
+  // glints from the lights above
+  vec3 r = reflect(-v, n);
+  float spec = pow(max(r.y, 0.0), 220.0) * uSpecular;
+  col += L * spec * 2.5;
+  col += flashlight(wp, n) * 0.25 * uShallow;
+  col = applyFog(col, distance(cameraPosition, wp));
+  float alpha = mix(uClarity < 0.5 ? 0.97 : 0.42, 0.98, fres);
+  gl_FragColor = vec4(col, alpha);
+}
+`;
+
+export function waterMaterial(def) {
+  return new THREE.ShaderMaterial({
+    vertexShader: WORLD_VERT,
+    fragmentShader: WATER_FRAG,
+    uniforms: {
+      ...G,
+      uWarp: { value: 0 },
+      uDeep: { value: new THREE.Color(...(def.deep || [0.01, 0.02, 0.03])) },
+      uShallow: { value: new THREE.Color(...(def.shallow || [0.3, 0.6, 0.65])) },
+      uReflect: { value: new THREE.Color(...(def.reflect || [0.6, 0.65, 0.7])) },
+      uClarity: { value: def.clarity ?? 0.8 },
+      uSpecular: { value: def.specular ?? 1 },
+    },
+    transparent: true,
+    depthWrite: false,
   });
 }

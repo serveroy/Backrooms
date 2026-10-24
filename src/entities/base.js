@@ -343,7 +343,7 @@ export class Entity {
     this.lightT = 0.12;
     const l = this.world.lightAt(this.x, this.y + 1.2, this.z, this._l);
     for (const m of this.mats) m.uniforms.uObjLight.value.set(l[0], l[1], l[2]);
-    this.light = (l[0] + l[1] + l[2]) / 3;
+    this.light = ((l[0] + l[1] + l[2]) / 3) * this.game.lightScale;
   }
 
   sync() {

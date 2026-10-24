@@ -22,7 +22,7 @@ export function buildChunkData(getLayout, level, cx, cz, matSizes) {
   const cfg = level.config;
   const L = getLayout(cx, cz);
   const region = new Region(getLayout, cx, cz);
-  const builders = meshChunk(region, L, matSizes, { soffitMat: level.soffitMat ?? 0 });
+  const builders = meshChunk(region, L, matSizes, { soffitMat: level.soffitMat ?? 0, waterMat: level.waterMat ?? 0 });
   const getB = (key) => {
     let b = builders.get(key);
     if (!b) {

@@ -78,7 +78,7 @@ export class FixtureSystem {
       }
       case 'strobe': {
         const period = f && f.period ? f.period : 0.9;
-        const ph = ((t + seed) % period) / period;
+        const ph = ((t + (f && f.sync ? 0 : seed)) % period) / period;
         return ph < 0.5 ? 1 : 0.05;
       }
       case 'pulse': {

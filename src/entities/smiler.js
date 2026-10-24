@@ -137,7 +137,7 @@ export class Smiler extends Entity {
     if (this.lightT > 0) return;
     this.lightT = 0.2;
     const l = this.world.lightAt(this.x, 1.7, this.z, this._l);
-    this.light = (l[0] + l[1] + l[2]) / 3;
+    this.light = ((l[0] + l[1] + l[2]) / 3) * this.game.lightScale;
   }
 
   dispose() {
